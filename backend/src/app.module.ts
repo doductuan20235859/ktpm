@@ -1,0 +1,46 @@
+import { Module, OnModuleInit } from '@nestjs/common'; // 1. Thêm OnModuleInit
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm'; // 2. Thêm DataSource
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { Product } from './product.entity'; // Import file vừa tạo
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get<string>('DB_HOST'),
+        port: configService.get<number>('DB_PORT'),
+        username: configService.get<string>('DB_USERNAME'),
+        password: configService.get<string>('DB_PASSWORD'),
+        database: configService.get<string>('DB_NAME'),
+        autoLoadEntities: true,
+        entities: [Product], // <--- THÊM VÀO ĐÂY (hoặc để autoLoadEntities: true thì không cần)
+        synchronize: true,
+      }),
+    }),
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+// 3. Sửa class AppModule như sau:
+export class AppModule implements OnModuleInit {
+  // Inject DataSource vào để kiểm tra kết nối
+  constructor(private dataSource: DataSource) {}
+
+  onModuleInit() {
+    if (this.dataSource.isInitialized) {
+      console.log('================================================');
+      console.log('✅  KẾT NỐI DATABASE THÀNH CÔNG!  ✅');
+      console.log('================================================');
+    }
+  }
+}
