@@ -2,18 +2,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation"; // Hook để chuyển trang
+import { useRouter } from "next/navigation";
 import { Building2, Eye, EyeOff, LogIn, UserPlus, Key } from "lucide-react";
 
 export default function LoginPage() {
-  // <--- Phải là DEFAULT export
   const router = useRouter();
 
-  // Các state cũ giữ nguyên
+  // State
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"admin" | "resident">("admin");
+
+  // View State
   const [currentView, setCurrentView] = useState<
     "login" | "register" | "forgot"
   >("login");
@@ -29,7 +30,7 @@ export default function LoginPage() {
     role: "resident" as "admin" | "resident",
   });
 
-  // Forgot password form states
+  // Forgot password states
   const [forgotPhone, setForgotPhone] = useState("");
   const [resetStep, setResetStep] = useState<"phone" | "code" | "newPassword">(
     "phone"
@@ -38,47 +39,72 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  // --- HÀM XỬ LÝ ĐĂNG NHẬP GỌI API (ĐÃ SỬA) ---
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
-      const trimmedPhone = phone.trim();
-      const trimmedPassword = password.trim();
+    try {
+      // 1. Gọi API Backend
+      const response = await fetch("http://[::1]:3001/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phoneNumber: phone,
+          password: password,
+          role: role.toUpperCase(), // Gửi lên backend: 'ADMIN' hoặc 'RESIDENT'
+        }),
+      });
 
-      const isValidAdminAccount =
-        trimmedPhone === "0912345678" && trimmedPassword === "123456";
-      const isValidResidentAccount =
-        trimmedPhone === "0987654321" && trimmedPassword === "123456";
+      const data = await response.json();
 
-      if (isValidAdminAccount || isValidResidentAccount) {
-        // --- LOGIC MỚI CHO NEXT.JS ---
-        // 1. Lưu thông tin đăng nhập (ví dụ lưu vào localStorage hoặc Cookie)
-        localStorage.setItem("userRole", role);
-        localStorage.setItem("isLoggedIn", "true");
-
-        // 2. Chuyển hướng dựa trên Role
-        if (role === "resident") {
-          router.push("/portal"); // Ví dụ trang cư dân
-        } else {
-          router.push("/dashboard"); // Trang admin
-        }
-      } else {
-        alert("Số điện thoại hoặc mật khẩu không đúng!");
+      // 2. Kiểm tra lỗi từ Backend
+      if (!response.ok) {
+        throw new Error(data.message || "Đăng nhập thất bại");
       }
-    }, 1000);
+
+      // 3. Đăng nhập thành công - Lưu dữ liệu vào localStorage
+      console.log("Login Success Data:", data); // Log để kiểm tra
+
+      localStorage.setItem("accessToken", data.accessToken);
+
+      // Lưu thông tin User (Bao gồm cả role từ DB trả về cho chắc chắn)
+      if (data.user) {
+        localStorage.setItem("userInfo", JSON.stringify(data.user));
+        localStorage.setItem("userRole", data.user.role); // Lưu "ADMIN" hoặc "RESIDENT"
+      }
+
+      // 4. Chuyển hướng dựa trên Role TRẢ VỀ TỪ BACKEND
+      // Backend trả về: "ADMIN" hoặc "RESIDENT" (Uppercase)
+      const userRole = data.user?.role;
+
+      alert(`Đăng nhập thành công! Xin chào ${data.user?.fullName}`);
+
+      if (userRole === "ADMIN") {
+        router.push("/dashboard");
+      } else if (userRole === "RESIDENT") {
+        router.push("/portal");
+      } else {
+        // Trường hợp role lạ hoặc lỗi
+        console.error("Unknown role:", userRole);
+        router.push("/");
+      }
+    } catch (error: any) {
+      // Xử lý lỗi
+      console.error("Login Error:", error);
+      alert(error.message || "Có lỗi xảy ra khi kết nối tới server.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ... (Phần logic handleRegister và handleForgotPassword GIỮ NGUYÊN)
+  // ... (Các hàm handleRegister và handleForgotPassword giữ nguyên)
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (registerData.password !== registerData.confirmPassword) {
       alert("Mật khẩu xác nhận không khớp!");
-      return;
-    }
-    if (registerData.password.length < 6) {
-      alert("Mật khẩu phải có ít nhất 6 ký tự!");
       return;
     }
     setLoading(true);
@@ -96,7 +122,7 @@ export default function LoginPage() {
     setTimeout(() => {
       setLoading(false);
       if (resetStep === "phone") {
-        alert("Mã xác nhận đã được gửi đến số điện thoại của bạn!");
+        alert("Mã xác nhận giả lập: 123456");
         setResetStep("code");
       } else if (resetStep === "code") {
         if (verificationCode === "123456") {
@@ -118,10 +144,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      {/* ... (Phần giao diện UI bên trong giữ nguyên hoàn toàn như cũ) ... */}
-      {/* COPY TOÀN BỘ PHẦN return TỪ FILE CŨ VÀO ĐÂY, CHỈ LƯU Ý PHẦN FORM LOGIN GỌI HÀM handleLogin ĐÃ SỬA Ở TRÊN */}
-
       <div className="w-full max-w-md relative z-10">
+        {/* Header */}
         <div className="text-center mb-8 animate-fade-in">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg hover:shadow-xl transition-shadow">
             <Building2 className="w-9 h-9 text-white" />
@@ -136,7 +160,9 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Card Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 animate-slide-up backdrop-blur-sm bg-white/95">
+          {/* LOGIN FORM */}
           {currentView === "login" && (
             <form onSubmit={handleLogin} className="space-y-5">
               {/* Role Selection */}
@@ -178,14 +204,10 @@ export default function LoginPage() {
 
               {/* Phone Input */}
               <div>
-                <label
-                  htmlFor="phone"
-                  className="block text-sm text-gray-700 mb-2"
-                >
+                <label className="block text-sm text-gray-700 mb-2">
                   Số điện thoại
                 </label>
                 <input
-                  id="phone"
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -197,15 +219,11 @@ export default function LoginPage() {
 
               {/* Password Input */}
               <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm text-gray-700 mb-2"
-                >
+                <label className="block text-sm text-gray-700 mb-2">
                   Mật khẩu
                 </label>
                 <div className="relative">
                   <input
-                    id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -243,35 +261,184 @@ export default function LoginPage() {
                 className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
               >
                 <LogIn className="w-5 h-5" />
-                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+                {loading ? "Đang xử lý..." : "Đăng nhập"}
               </button>
 
-              <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
-                <p className="text-xs text-amber-900 text-center mb-2">
-                  <strong>Tài khoản demo:</strong>
-                </p>
-                <div className="space-y-1 text-xs text-amber-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhone("0912345678");
-                      setPassword("123456");
-                      setRole("admin");
-                    }}
-                    className="w-full flex items-center justify-between bg-white/60 hover:bg-white/90 px-3 py-2 rounded transition-colors"
-                  >
-                    <span>👨‍💼 Admin:</span>
-                    <span>
-                      <strong>0912345678</strong> | 123456
-                    </span>
-                  </button>
-                </div>
+              {/* Nút chuyển sang đăng ký */}
+              <div className="mt-4 text-center">
+                <span className="text-sm text-gray-600">
+                  Chưa có tài khoản?{" "}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("register")}
+                  className="text-sm text-blue-600 font-semibold hover:underline"
+                >
+                  Đăng ký ngay
+                </button>
               </div>
             </form>
           )}
 
-          {/* ... Copy nốt phần Register và Forgot form vào đây ... */}
-          {/* Để cho ngắn gọn tôi không paste lại toàn bộ UI, bạn hãy copy phần UI của file cũ vào đây nhé */}
+          {/* REGISTER FORM */}
+          {currentView === "register" && (
+            <form onSubmit={handleRegister} className="space-y-4">
+              {/* Simplified Register Form */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Họ và tên
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 border rounded-lg"
+                  value={registerData.fullName}
+                  onChange={(e) =>
+                    setRegisterData({
+                      ...registerData,
+                      fullName: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Số điện thoại
+                </label>
+                <input
+                  type="tel"
+                  className="w-full px-4 py-3 border rounded-lg"
+                  value={registerData.phone}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, phone: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Mật khẩu
+                </label>
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 border rounded-lg"
+                  value={registerData.password}
+                  onChange={(e) =>
+                    setRegisterData({
+                      ...registerData,
+                      password: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Nhập lại mật khẩu
+                </label>
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 border rounded-lg"
+                  value={registerData.confirmPassword}
+                  onChange={(e) =>
+                    setRegisterData({
+                      ...registerData,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+              >
+                {loading ? "Đang xử lý..." : "Đăng ký"}
+              </button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("login")}
+                  className="text-sm text-gray-600 hover:text-blue-600"
+                >
+                  Quay lại đăng nhập
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* FORGOT PASSWORD FORM */}
+          {currentView === "forgot" && (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              {resetStep === "phone" && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    className="w-full px-4 py-3 border rounded-lg"
+                    value={forgotPhone}
+                    onChange={(e) => setForgotPhone(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+              {resetStep === "code" && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">
+                    Mã xác nhận (Demo: 123456)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-3 border rounded-lg"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+              {resetStep === "newPassword" && (
+                <div className="space-y-4">
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu mới"
+                    className="w-full px-4 py-3 border rounded-lg"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Xác nhận mật khẩu"
+                    className="w-full px-4 py-3 border rounded-lg"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-all"
+              >
+                {loading ? "Đang xử lý..." : "Tiếp tục"}
+              </button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("login")}
+                  className="text-sm text-gray-600 hover:text-blue-600"
+                >
+                  Quay lại đăng nhập
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>
