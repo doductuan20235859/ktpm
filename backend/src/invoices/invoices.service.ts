@@ -1,26 +1,20 @@
+// invoices.service.ts
 import { Injectable } from '@nestjs/common';
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Invoice } from './entities/invoice.entity';
 
 @Injectable()
 export class InvoicesService {
-  create(createInvoiceDto: CreateInvoiceDto) {
-    return 'This action adds a new invoice';
-  }
+  constructor(
+    @InjectRepository(Invoice)
+    private invoiceRepository: Repository<Invoice>,
+  ) {}
 
-  findAll() {
-    return `This action returns all invoices`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} invoice`;
-  }
-
-  update(id: number, updateInvoiceDto: UpdateInvoiceDto) {
-    return `This action updates a #${id} invoice`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} invoice`;
+  // Hàm lấy tất cả hóa đơn
+  findAll(): Promise<Invoice[]> {
+    return this.invoiceRepository.find({
+  relations: ['apartment'], // Thêm dòng này để lấy thông tin căn hộ
+});
   }
 }

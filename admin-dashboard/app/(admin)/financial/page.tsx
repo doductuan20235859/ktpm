@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import {
   Search,
   Filter,
@@ -24,7 +25,8 @@ interface Invoice {
   totalAmount: number;
   paidAmount: number;
   status: InvoiceStatus;
-  dueDate: string;
+  dueDate: Date;          // Để là Date nếu bạn lưu đối tượng
+  displayDueDate: string; // Để là string cho bản đã format
   items: InvoiceItem[];
 }
 
@@ -36,176 +38,47 @@ interface InvoiceItem {
   paid: boolean;
 }
 
-const mockInvoices: Invoice[] = [
-  {
-    id: "1",
-    invoiceNo: "INV-2024-12-001",
-    apartmentCode: "A-101",
-    period: "2024-12",
-    totalAmount: 2850000,
-    paidAmount: 2850000,
-    status: "PAID",
-    dueDate: "15/12/2024",
-    items: [
-      {
-        id: "1",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 1200000,
-        paid: true,
-      },
-      {
-        id: "2",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 850000,
-        paid: true,
-      },
-      {
-        id: "3",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô",
-        amount: 800000,
-        paid: true,
-      },
-    ],
-  },
-  {
-    id: "2",
-    invoiceNo: "INV-2024-12-002",
-    apartmentCode: "A-102",
-    period: "2024-12",
-    totalAmount: 3250000,
-    paidAmount: 1500000,
-    status: "PARTIAL",
-    dueDate: "15/12/2024",
-    items: [
-      {
-        id: "4",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 1500000,
-        paid: true,
-      },
-      {
-        id: "5",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 950000,
-        paid: false,
-      },
-      {
-        id: "6",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô + xe máy",
-        amount: 800000,
-        paid: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    invoiceNo: "INV-2024-12-003",
-    apartmentCode: "B-201",
-    period: "2024-12",
-    totalAmount: 4200000,
-    paidAmount: 0,
-    status: "OVERDUE",
-    dueDate: "10/12/2024",
-    items: [
-      {
-        id: "7",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 2000000,
-        paid: false,
-      },
-      {
-        id: "8",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 1200000,
-        paid: false,
-      },
-      {
-        id: "9",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô",
-        amount: 1000000,
-        paid: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    invoiceNo: "INV-2024-12-004",
-    apartmentCode: "B-202",
-    period: "2024-12",
-    totalAmount: 2650000,
-    paidAmount: 0,
-    status: "PUBLISHED",
-    dueDate: "20/12/2024",
-    items: [
-      {
-        id: "10",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 1150000,
-        paid: false,
-      },
-      {
-        id: "11",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 800000,
-        paid: false,
-      },
-      {
-        id: "12",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe xe máy",
-        amount: 700000,
-        paid: false,
-      },
-    ],
-  },
-  {
-    id: "5",
-    invoiceNo: "INV-2024-12-005",
-    apartmentCode: "C-301",
-    period: "2024-12",
-    totalAmount: 5100000,
-    paidAmount: 0,
-    status: "PUBLISHED",
-    dueDate: "20/12/2024",
-    items: [
-      {
-        id: "13",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 2500000,
-        paid: false,
-      },
-      {
-        id: "14",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 1600000,
-        paid: false,
-      },
-      {
-        id: "15",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô",
-        amount: 1000000,
-        paid: false,
-      },
-    ],
-  },
-];
-
 export default function FinancialManagement() {
-  const [invoices] = useState<Invoice[]>(mockInvoices);
+  // Khởi tạo là mảng rỗng thay vì dùng dữ liệu mock
+const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+// Thêm hàm này để gọi API
+const fetchInvoicesFromDB = async () => {
+  try {
+    const response = await axios.get("http://localhost:3001/invoices");
+    
+    // Trích xuất mảng từ object { "data": [...] }
+    const dbData = response.data.data; 
+
+    const mappedData = dbData.map((item: any) => ({
+      id: item.id.toString(),
+      // Lấy invoiceCode từ JSON và gán vào invoiceNo để hiển thị ở bảng
+      invoiceNo: item.invoiceCode, 
+      // Mapping căn hộ (vì DB hiện chưa có số căn hộ rõ ràng, ta tạm dùng ID)
+      apartmentCode: item.apartment.code, 
+      // Cắt chuỗi lấy YYYY-MM
+      period: item.periodDate.substring(0, 7), 
+      // Chuyển string "1500000.00" thành số để tính toán
+      totalAmount: Number(item.totalAmount),
+      // Giả định: nếu PAID thì đã trả hết, nếu UNPAID thì chưa trả
+      paidAmount: Number(item.paidAmount),
+      // status: item.status === "UNPAID" ? "PUBLISHED" : item.status,
+      status: calculateStatus(item.totalAmount, item.paidAmount, new Date(item.dueDate)),
+      // Định dạng ngày hiển thị: 20/11/2024
+      dueDate: new Date(item.dueDate),
+      displayDueDate: new Date(item.dueDate).toLocaleDateString("vi-VN"),
+      items: [] 
+    }));
+
+    setInvoices(mappedData);
+  } catch (error) {
+    console.error("Lỗi kết nối API:", error);
+  }
+};
+// Gọi hàm này ngay khi trang vừa load
+useEffect(() => {
+  fetchInvoicesFromDB();
+}, []);
   const [periodFilter, setPeriodFilter] = useState("2024-12");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
@@ -219,6 +92,32 @@ export default function FinancialManagement() {
       currency: "VND",
     }).format(value);
   };
+
+  const calculateStatus = (total: number, paid: number, dueDateStr: Date): string => {
+  const remaining = total - paid;
+  const dueDate = dueDateStr;
+  const now = new Date();
+  
+  // 1. Nếu tiền còn phải trả là 0 -> PAID
+  if (remaining <= 0) return "PAID";
+
+  // 2. Kiểm tra xem đã quá hạn chưa
+  const isOverdue = now > dueDate;
+
+  if (isOverdue) {
+    // Nếu quá hạn mà vẫn còn nợ -> OVERDUE
+    return "OVERDUE";
+  } else {
+    // Nếu chưa quá hạn
+    if (paid > 0) {
+      // Đã trả một phần -> PARTIAL
+      return "PARTIAL";
+    } else {
+      // Chưa thanh toán đồng nào -> PUBLISHED
+      return "PUBLISHED";
+    }
+  }
+};
 
   const getStatusBadge = (status: InvoiceStatus) => {
     const styles = {
@@ -442,7 +341,7 @@ export default function FinancialManagement() {
                       {formatCurrency(remaining)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {invoice.dueDate}
+                      {invoice.displayDueDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -511,7 +410,7 @@ export default function FinancialManagement() {
                 <div>
                   <p className="text-sm text-gray-600">Hạn thanh toán</p>
                   <p className="text-lg text-gray-900">
-                    {selectedInvoice.dueDate}
+                    {selectedInvoice.displayDueDate}
                   </p>
                 </div>
                 <div>
