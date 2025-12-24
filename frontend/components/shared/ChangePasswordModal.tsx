@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Eye, EyeOff, Lock, CheckCircle } from "lucide-react";
+import { X, Eye, EyeOff, Lock, CheckCircle, Loader2 } from "lucide-react"; // Thêm icon Loader2
 import { toast } from "sonner";
 
 interface ChangePasswordModalProps {
@@ -16,6 +16,7 @@ export function ChangePasswordModal({
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // State loading khi gọi API
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -50,7 +51,7 @@ export function ChangePasswordModal({
     setErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newErrors = {
@@ -92,32 +93,67 @@ export function ChangePasswordModal({
 
     setErrors(newErrors);
 
-    // If there are errors, stop
+    // If there are validation errors, stop
     if (Object.values(newErrors).some((error) => error !== "")) {
       return;
     }
 
-    // Mock API call to change password
-    console.log("Changing password for:", userRole);
+    // --- GỌI API BACKEND ---
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+        return;
+      }
 
-    // Simulate success
-    toast.success("Đổi mật khẩu thành công!", {
-      description: "Vui lòng sử dụng mật khẩu mới để đăng nhập lần sau.",
-      duration: 3000,
-    });
+      const response = await fetch("http://[::1]:3001/users/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      });
 
-    // Reset form and close modal
-    setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setErrors({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    onClose();
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Xử lý lỗi từ backend trả về (ví dụ: sai mật khẩu cũ)
+        throw new Error(data.message || "Đổi mật khẩu thất bại");
+      }
+
+      // Thành công
+      toast.success("Đổi mật khẩu thành công!", {
+        description: "Vui lòng sử dụng mật khẩu mới cho lần đăng nhập sau.",
+        duration: 3000,
+      });
+
+      // Reset form and close modal
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      onClose();
+    } catch (error: any) {
+      console.error("Change password error:", error);
+      // Hiển thị lỗi từ backend lên Toast hoặc gán vào field error tương ứng
+      toast.error(error.message || "Có lỗi xảy ra khi kết nối server");
+
+      // Nếu lỗi là do sai mật khẩu cũ, có thể set error trực tiếp vào input
+      if (error.message.includes("hiện tại không chính xác")) {
+        setErrors((prev) => ({
+          ...prev,
+          currentPassword: "Mật khẩu hiện tại không đúng",
+        }));
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -125,7 +161,8 @@ export function ChangePasswordModal({
       passwordData.currentPassword ||
       passwordData.newPassword ||
       passwordData.confirmPassword;
-    if (hasInput) {
+    if (hasInput && !isLoading) {
+      // Chỉ confirm đóng khi không đang loading
       const confirmClose = window.confirm("Bạn có chắc muốn hủy đổi mật khẩu?");
       if (confirmClose) {
         setPasswordData({
@@ -152,7 +189,7 @@ export function ChangePasswordModal({
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity"
-        onClick={handleClose}
+        onClick={!isLoading ? handleClose : undefined} // Chặn click overlay khi đang loading
       />
 
       {/* Modal */}
@@ -161,7 +198,8 @@ export function ChangePasswordModal({
         <div className="relative px-6 py-5 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 rounded-t-2xl">
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 p-1.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 rounded-full transition-colors"
+            disabled={isLoading}
+            className="absolute top-4 right-4 p-1.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5 text-white" />
           </button>
@@ -193,7 +231,8 @@ export function ChangePasswordModal({
                 onChange={(e) =>
                   handleInputChange("currentPassword", e.target.value)
                 }
-                className={`w-full pl-11 pr-11 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition-all ${
+                disabled={isLoading}
+                className={`w-full pl-11 pr-11 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition-all disabled:opacity-70 disabled:cursor-not-allowed ${
                   errors.currentPassword
                     ? "border-red-300 focus:ring-red-500"
                     : "border-gray-200 focus:ring-blue-500"
@@ -232,7 +271,8 @@ export function ChangePasswordModal({
                 onChange={(e) =>
                   handleInputChange("newPassword", e.target.value)
                 }
-                className={`w-full pl-11 pr-11 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition-all ${
+                disabled={isLoading}
+                className={`w-full pl-11 pr-11 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition-all disabled:opacity-70 disabled:cursor-not-allowed ${
                   errors.newPassword
                     ? "border-red-300 focus:ring-red-500"
                     : "border-gray-200 focus:ring-blue-500"
@@ -316,7 +356,8 @@ export function ChangePasswordModal({
                 onChange={(e) =>
                   handleInputChange("confirmPassword", e.target.value)
                 }
-                className={`w-full pl-11 pr-11 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition-all ${
+                disabled={isLoading}
+                className={`w-full pl-11 pr-11 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition-all disabled:opacity-70 disabled:cursor-not-allowed ${
                   errors.confirmPassword
                     ? "border-red-300 focus:ring-red-500"
                     : "border-gray-200 focus:ring-blue-500"
@@ -347,15 +388,18 @@ export function ChangePasswordModal({
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+              disabled={isLoading}
+              className="px-5 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Hủy
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl transition-all shadow-md hover:shadow-lg"
+              disabled={isLoading}
+              className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Đổi mật khẩu
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isLoading ? "Đang xử lý..." : "Đổi mật khẩu"}
             </button>
           </div>
         </form>

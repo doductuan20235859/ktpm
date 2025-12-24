@@ -13,7 +13,8 @@ import { RequestsModule } from './requests/requests.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { AmenitiesModule } from './amenities/amenities.module';
 import { NotificationsModule } from './notifications/notifications.module';
-
+import { ServeStaticModule } from '@nestjs/serve-static'; // <--- Import này
+import { join } from 'path';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,6 +35,10 @@ import { NotificationsModule } from './notifications/notifications.module';
         entities: [Product], // <--- THÊM VÀO ĐÂY (hoặc để autoLoadEntities: true thì không cần)
         synchronize: true,
       }),
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'), // Thư mục chứa ảnh
+      serveRoot: '/uploads', // Đường dẫn truy cập (VD: localhost:3001/uploads/abc.jpg)
     }),
     UsersModule,
     AuthModule,

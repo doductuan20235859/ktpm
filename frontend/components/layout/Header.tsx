@@ -42,7 +42,7 @@ export function Header({
 
         {/* User Info & Role Switcher */}
         <div className="flex items-center gap-3">
-          <select
+          {/* <select
             value={userRole}
             onChange={(e) =>
               setUserRole(e.target.value as "admin" | "resident")
@@ -51,7 +51,7 @@ export function Header({
           >
             <option value="admin">Admin</option>
             <option value="resident">Cư dân</option>
-          </select>
+          </select> */}
 
           <button
             onClick={onProfileClick}

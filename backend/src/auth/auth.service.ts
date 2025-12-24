@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
+import { UserRole } from '../common/enums/database.enums';
 
 @Injectable()
 export class AuthService {
@@ -16,13 +17,25 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { phoneNumber, password, role } = loginDto;
 
-    // 1. Tìm user trong DB
-    // Vẫn cần addSelect vì cột passwordHash đang ẩn (select: false) trong Entity
-    const user = await this.usersRepository
+    // 1. Tìm user trong DB và JOIN lấy thông tin căn hộ
+    const query = this.usersRepository
       .createQueryBuilder('user')
-      .addSelect('user.passwordHash')
-      .where('user.phoneNumber = :phoneNumber', { phoneNumber })
-      .getOne();
+      .addSelect('user.passwordHash') // Lấy mật khẩu để so sánh
+      .where('user.phoneNumber = :phoneNumber', { phoneNumber });
+
+    // Nếu là Resident, ta cần join thêm bảng để lấy mã căn hộ
+    if (role === UserRole.RESIDENT) {
+      query
+        .leftJoinAndSelect(
+          'user.residents',
+          'resident',
+          'resident.isActive = :isActive',
+          { isActive: true },
+        )
+        .leftJoinAndSelect('resident.apartment', 'apartment');
+    }
+
+    const user = await query.getOne();
 
     // 2. Kiểm tra user tồn tại
     if (!user) {
@@ -36,23 +49,44 @@ export class AuthService {
       throw new UnauthorizedException(`Tài khoản này không phải là ${role}`);
     }
 
-    // 4. SO SÁNH TRỰC TIẾP (KHÔNG DÙNG BCRYPT)
-    // Lưu ý: Lúc này trong DB cột password_hash sẽ lưu chuỗi "123456" chứ không phải mã băm
+    // 4. So sánh mật khẩu
     if (user.passwordHash !== password) {
       throw new UnauthorizedException(
         'Số điện thoại hoặc mật khẩu không chính xác',
       );
     }
 
-    // 5. Tạo Token
-    const payload = { sub: user.id, phone: user.phoneNumber, role: user.role };
+    // 5. Xử lý lấy mã căn hộ
+    let apartmentCode: string | null = null;
+    // --- SỬA LỖI TẠI ĐÂY: Đổi từ string sang number ---
+    let apartmentId: number | null = null;
 
-    // Loại bỏ password ra khỏi object trả về
-    const { passwordHash, ...userInfo } = user;
+    if (user.role === UserRole.RESIDENT && user.residents?.length > 0) {
+      const activeResidency = user.residents[0];
+      if (activeResidency?.apartment) {
+        apartmentCode = activeResidency.apartment.code;
+        apartmentId = activeResidency.apartment.id; // id trong DB là number
+      }
+    }
+
+    // 6. Tạo Token
+    const payload = {
+      sub: user.id,
+      phone: user.phoneNumber,
+      role: user.role,
+      apartmentCode: apartmentCode,
+    };
+
+    // 7. Chuẩn bị dữ liệu trả về
+    const { passwordHash, residents, ...userInfo } = user;
 
     return {
       accessToken: this.jwtService.sign(payload),
-      user: userInfo,
+      user: {
+        ...userInfo,
+        apartmentCode: apartmentCode,
+        apartmentId: apartmentId,
+      },
     };
   }
 }

@@ -1,13 +1,6 @@
-import { useState, useRef } from "react";
-import {
-  X,
-  Camera,
-  Calendar,
-  Phone,
-  MessageSquare,
-  CheckCircle,
-  LogOut,
-} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { X, Camera, Phone, CheckCircle, LogOut, Key } from "lucide-react";
 import { ChangePasswordModal } from "../shared/ChangePasswordModal";
 import { toast } from "sonner";
 
@@ -28,13 +21,16 @@ export function ProfileDrawer({
   avatarUrl: initialAvatarUrl,
   onAvatarChange,
 }: ProfileDrawerProps) {
+  const router = useRouter();
+
   const [profileData, setProfileData] = useState({
-    fullName: userRole === "admin" ? "Nguyễn Văn Admin" : "Nguyễn Văn An",
-    dob: userRole === "admin" ? "1985-05-15" : "1990-03-20",
-    phone: userRole === "admin" ? "0912345678" : "0987654321",
-    zaloId: userRole === "admin" ? "admin.nguyen" : "vanan90",
-    apartment: userRole === "admin" ? "N/A" : "Căn A-101",
+    fullName: "",
+    dob: "",
+    phone: "",
+    zaloId: "",
+    apartment: "",
     status: "active",
+    realRole: "",
   });
 
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string>(
@@ -46,6 +42,36 @@ export function ProfileDrawer({
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // --- LOGIC LOAD DỮ LIỆU TỪ LOCAL STORAGE ---
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const storedUserInfo = localStorage.getItem("userInfo");
+        if (storedUserInfo) {
+          const user = JSON.parse(storedUserInfo);
+
+          setProfileData((prev) => ({
+            ...prev,
+            fullName: user.fullName || "",
+            phone: user.phoneNumber || "",
+            realRole: user.role || "",
+            apartment:
+              user.apartmentCode ||
+              (user.role === "ADMIN" ? "Văn phòng BQL" : "Đang cập nhật"),
+          }));
+
+          // [QUAN TRỌNG] Lấy ảnh từ LocalStorage hiển thị lên ngay khi mở
+          if (user.avatarUrl) {
+            setLocalAvatarUrl(user.avatarUrl);
+          }
+        }
+      } catch (error) {
+        console.error("Lỗi đọc dữ liệu user:", error);
+      }
+    }
+  }, [isOpen]);
 
   const handleInputChange = (field: string, value: string) => {
     setProfileData((prev) => ({ ...prev, [field]: value }));
@@ -59,16 +85,18 @@ export function ProfileDrawer({
         toast.error("Kích thước ảnh không được vượt quá 5MB");
         return;
       }
+
+      // Lưu file gốc để tí nữa gửi lên server
+      setSelectedFile(file);
+
+      // Hiển thị Preview tạm thời bằng Base64 để user thấy ngay
       const reader = new FileReader();
       reader.onloadend = () => {
         setLocalAvatarUrl(reader.result as string);
         setIsEdited(true);
         toast.success("Đã chọn ảnh đại diện mới", {
-          description: 'Nhấn "Lưu thay đổi" để cập nhật',
+          description: 'Nhấn "Lưu thay đổi" để cập nhật lên hệ thống',
         });
-        if (onAvatarChange) {
-          onAvatarChange(reader.result as string);
-        }
       };
       reader.readAsDataURL(file);
     }
@@ -85,39 +113,97 @@ export function ProfileDrawer({
       reader.onloadend = () => {
         setCoverUrl(reader.result as string);
         setIsEdited(true);
-        toast.success("Đã chọn ảnh bìa mới", {
-          description: 'Nhấn "Lưu thay đổi" để cập nhật',
-        });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSave = () => {
-    // Save logic here
-    console.log("Saving profile data:", profileData);
-    setIsEdited(false);
-    // Show success toast
-    toast.success("Cập nhật thông tin thành công!", {
-      description: "Thông tin cá nhân đã được lưu.",
-      duration: 3000,
-    });
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      // A. Nếu có chọn ảnh mới -> Upload ảnh trước
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("avatar", selectedFile);
+
+        const uploadRes = await fetch("http://[::1]:3001/users/upload-avatar", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const status = uploadRes.status;
+          let errorMsg = "Lỗi không xác định";
+          try {
+            const errorData = await uploadRes.json();
+            errorMsg = errorData.message || JSON.stringify(errorData);
+          } catch (e) {
+            errorMsg = await uploadRes.text();
+          }
+          throw new Error(`Server báo lỗi (${status}): ${errorMsg}`);
+        }
+
+        const uploadData = await uploadRes.json();
+
+        // [QUAN TRỌNG] Cập nhật URL ảnh mới từ Backend vào localStorage
+        const storedUserInfo = localStorage.getItem("userInfo");
+        if (storedUserInfo) {
+          const user = JSON.parse(storedUserInfo);
+          user.avatarUrl = uploadData.avatarUrl; // Lưu link mới (http://localhost:3001/uploads/...)
+          localStorage.setItem("userInfo", JSON.stringify(user));
+        }
+
+        // [QUAN TRỌNG] Cập nhật State hiển thị bằng Link thật từ Server (thay thế preview base64)
+        setLocalAvatarUrl(uploadData.avatarUrl);
+
+        console.log("Ảnh mới đã lưu:", uploadData.avatarUrl);
+      }
+
+      // B. Cập nhật các thông tin text khác
+      const storedUserInfo = localStorage.getItem("userInfo");
+      if (storedUserInfo) {
+        const user = JSON.parse(storedUserInfo);
+        const updatedUser = {
+          ...user,
+          fullName: profileData.fullName,
+          phoneNumber: profileData.phone,
+        };
+        localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+      }
+
+      setIsEdited(false);
+      setSelectedFile(null);
+
+      toast.success("Cập nhật thông tin thành công!", {
+        description: "Thông tin cá nhân đã được lưu.",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Có lỗi xảy ra khi lưu thông tin");
+    }
   };
 
   const handleLogout = () => {
     const confirmLogout = window.confirm("Bạn có chắc muốn đăng xuất?");
     if (confirmLogout) {
-      // Mock logout logic
-      console.log("Logging out...");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userInfo");
+
       toast.success("Đăng xuất thành công!", {
         description: "Hẹn gặp lại bạn.",
         duration: 2000,
       });
-      // In a real app, this would redirect to login page
-      // window.location.href = '/login';
+
       if (onLogout) {
         onLogout();
       }
+      router.push("/login");
     }
   };
 
@@ -127,6 +213,14 @@ export function ProfileDrawer({
         "Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?"
       );
       if (confirmClose) {
+        // Reset lại avatar về giá trị cũ trong localStorage nếu đóng mà không lưu
+        const storedUserInfo = localStorage.getItem("userInfo");
+        if (storedUserInfo) {
+          const user = JSON.parse(storedUserInfo);
+          if (user.avatarUrl) setLocalAvatarUrl(user.avatarUrl);
+        }
+        setIsEdited(false);
+        setSelectedFile(null);
         onClose();
       }
     } else {
@@ -134,19 +228,23 @@ export function ProfileDrawer({
     }
   };
 
+  const getDisplayRole = () => {
+    if (profileData.realRole === "ADMIN") return "Ban Quản Lý";
+    if (profileData.realRole === "RESIDENT") return "Cư dân";
+    return userRole === "admin" ? "Ban Quản Lý" : "Cư dân";
+  };
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Overlay */}
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
         onClick={handleClose}
       />
 
-      {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col animate-slide-in-right">
-        {/* Cover Image */}
+        {/* Cover Image Section */}
         <div
           className="relative h-32 flex-shrink-0 overflow-hidden"
           style={{
@@ -180,17 +278,26 @@ export function ProfileDrawer({
 
         {/* Profile Info Section */}
         <div className="relative px-6 pb-6 flex-shrink-0">
-          {/* Avatar overlapping banner */}
           <div className="relative -mt-16 mb-4">
-            <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-3xl overflow-hidden">
+            <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-3xl overflow-hidden bg-white">
               {localAvatarUrl ? (
                 <img
                   src={localAvatarUrl}
                   alt="Avatar"
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback nếu ảnh lỗi
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
                 />
               ) : (
-                <span>{profileData.fullName.charAt(0)}</span>
+                <span className="text-gray-400 font-bold text-4xl">
+                  {profileData.fullName.charAt(0)?.toUpperCase()}
+                </span>
+              )}
+              {/* Hiển thị chữ cái đầu nếu img lỗi hoặc không có url nhưng img bị ẩn */}
+              {localAvatarUrl && (
+                <span className="hidden">Mock to keep layout</span>
               )}
             </div>
             <button
@@ -208,14 +315,16 @@ export function ProfileDrawer({
             />
           </div>
 
-          {/* Name and Status */}
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-2xl text-gray-900 mb-1">
-                {profileData.fullName}
+              <h2 className="text-2xl text-gray-900 mb-1 font-bold">
+                {profileData.fullName || "Đang tải..."}
               </h2>
-              <p className="text-sm text-gray-500 mb-2">
-                {userRole === "admin" ? "Ban Quản Lý" : profileData.apartment}
+              <p className="text-sm text-gray-500 mb-2 font-medium">
+                {getDisplayRole()}
+                {profileData.apartment &&
+                  profileData.apartment !== "N/A" &&
+                  ` - ${profileData.apartment}`}
               </p>
             </div>
             <span className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm">
@@ -229,11 +338,12 @@ export function ProfileDrawer({
         <div className="flex-1 overflow-y-auto px-6 pb-24">
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm text-gray-500 mb-4">Thông tin cá nhân</h3>
+              <h3 className="text-sm text-gray-500 mb-4 font-semibold uppercase tracking-wider">
+                Thông tin cá nhân
+              </h3>
 
-              {/* Full Name Field */}
               <div className="mb-5">
-                <label className="block text-sm text-gray-700 mb-2">
+                <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Họ và tên đầy đủ
                 </label>
                 <input
@@ -247,25 +357,8 @@ export function ProfileDrawer({
                 />
               </div>
 
-              {/* DOB Field */}
               <div className="mb-5">
-                <label className="block text-sm text-gray-700 mb-2">
-                  Ngày sinh
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="date"
-                    value={profileData.dob}
-                    onChange={(e) => handleInputChange("dob", e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Phone Field */}
-              <div className="mb-5">
-                <label className="block text-sm text-gray-700 mb-2">
+                <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Số điện thoại
                 </label>
                 <div className="relative">
@@ -280,28 +373,9 @@ export function ProfileDrawer({
                 </div>
               </div>
 
-              {/* Zalo ID Field */}
-              <div className="mb-5">
-                <label className="block text-sm text-gray-700 mb-2">
-                  Zalo ID
-                </label>
-                <div className="relative">
-                  <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={profileData.zaloId}
-                    onChange={(e) =>
-                      handleInputChange("zaloId", e.target.value)
-                    }
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                    placeholder="Nhập Zalo ID"
-                  />
-                </div>
-              </div>
-
               {userRole === "resident" && (
                 <div className="mb-5">
-                  <label className="block text-sm text-gray-700 mb-2">
+                  <label className="block text-sm text-gray-700 mb-2 font-medium">
                     Căn hộ
                   </label>
                   <input
@@ -314,19 +388,21 @@ export function ProfileDrawer({
               )}
             </div>
 
-            {/* Additional Section */}
             <div className="pt-4 border-t border-gray-200">
-              <h3 className="text-sm text-gray-500 mb-4">Bảo mật</h3>
+              <h3 className="text-sm text-gray-500 mb-4 font-semibold uppercase tracking-wider">
+                Bảo mật
+              </h3>
               <div className="space-y-2">
                 <button
                   onClick={() => setIsChangePasswordOpen(true)}
-                  className="text-sm text-blue-600 hover:text-blue-700 py-2 flex items-center gap-2 transition-colors"
+                  className="w-full text-left text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg flex items-center gap-3 transition-colors"
                 >
-                  Đổi mật khẩu →
+                  <Key className="w-4 h-4" />
+                  Đổi mật khẩu
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-red-600 hover:text-red-700 py-2 flex items-center gap-2 transition-colors"
+                  className="w-full text-left text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg flex items-center gap-3 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   Đăng xuất
@@ -336,18 +412,17 @@ export function ProfileDrawer({
           </div>
         </div>
 
-        {/* Sticky Footer */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 shadow-lg">
           <button
             onClick={handleClose}
-            className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+            className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-medium"
           >
             Đóng
           </button>
           <button
             onClick={handleSave}
             disabled={!isEdited}
-            className={`px-6 py-2.5 rounded-xl transition-all ${
+            className={`px-6 py-2.5 rounded-xl transition-all font-medium ${
               isEdited
                 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
@@ -358,7 +433,6 @@ export function ProfileDrawer({
         </div>
       </div>
 
-      {/* Change Password Modal */}
       <ChangePasswordModal
         isOpen={isChangePasswordOpen}
         onClose={() => setIsChangePasswordOpen(false)}
@@ -367,14 +441,9 @@ export function ProfileDrawer({
 
       <style>{`
         @keyframes slide-in-right {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
         }
-        
         .animate-slide-in-right {
           animation: slide-in-right 0.3s ease-out;
         }
