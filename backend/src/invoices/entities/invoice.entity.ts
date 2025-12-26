@@ -37,9 +37,6 @@ export class Invoice {
   })
   totalAmount: number;
 
-  @Column({ type: 'enum', enum: InvoiceStatus, default: InvoiceStatus.UNPAID })
-  status: InvoiceStatus;
-
   @Column('text', { nullable: true })
   notes: string;
 

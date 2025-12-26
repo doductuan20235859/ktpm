@@ -13,6 +13,7 @@ import { RequestsModule } from './requests/requests.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { AmenitiesModule } from './amenities/amenities.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { InvoiceItemsModule } from './invoice_items/invoice_items.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     InvoicesModule,
     AmenitiesModule,
     NotificationsModule,
+    InvoiceItemsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

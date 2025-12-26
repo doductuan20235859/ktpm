@@ -54,18 +54,18 @@ const fetchInvoicesFromDB = async () => {
       id: item.id.toString(),
       // Lấy invoiceCode từ JSON và gán vào invoiceNo để hiển thị ở bảng
       invoiceNo: item.invoiceCode, 
-      // Mapping căn hộ (vì DB hiện chưa có số căn hộ rõ ràng, ta tạm dùng ID)
+      // Mapping căn hộ 
       apartmentCode: item.apartment.code, 
       // Cắt chuỗi lấy YYYY-MM
       period: item.periodDate.substring(0, 7), 
       // Chuyển string "1500000.00" thành số để tính toán
       totalAmount: Number(item.totalAmount),
-      // Giả định: nếu PAID thì đã trả hết, nếu UNPAID thì chưa trả
+      // paidAmount
       paidAmount: Number(item.paidAmount),
-      // status: item.status === "UNPAID" ? "PUBLISHED" : item.status,
+      // status
       status: calculateStatus(item.totalAmount, item.paidAmount, new Date(item.dueDate)),
-      // Định dạng ngày hiển thị: 20/11/2024
       dueDate: new Date(item.dueDate),
+      // Định dạng ngày hiển thị: 20/11/2024
       displayDueDate: new Date(item.dueDate).toLocaleDateString("vi-VN"),
       items: [] 
     }));

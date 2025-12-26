@@ -1,0 +1,336 @@
+import { useState } from 'react';
+import { ArrowLeft, Search, DollarSign, Printer, CheckCircle, Calendar } from 'lucide-react';
+import axios from 'axios';
+
+// Interface cho Hóa đơn (Invoice)
+interface Invoice {
+  id: string;
+  invoiceCode: string;
+  period: string;
+  dueDate: Date;
+  // Bạn có thể thêm apartment ở đây nếu backend trả về cả thông tin căn hộ lồng trong invoice
+  apartment?: {
+    id: string;
+    apartmentCode: string;
+  };
+  paidAmount: number;
+}
+
+interface UnpaidItem {
+  id: string;
+  invoiceNo: Invoice;
+  feeType: string;
+  description: string;
+  amount: number;
+}
+
+interface ReceiptEntryProps {
+  onBack: () => void;
+}
+
+export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
+  const [apartmentCode, setApartmentCode] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState('ALL');
+  const [searchResult, setSearchResult] = useState<UnpaidItem[] | null>(null);
+  const [unpaidItems, setUnpaidItems] = useState<UnpaidItem[]>([]);
+  const [amountReceived, setAmountReceived] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [note, setNote] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(value);
+  };
+
+
+  const handleSearch = async () => {
+  
+  try {
+    // Gọi API tới NestJS Backend
+    const response = await axios.get(`http://localhost:3001/invoice_items/apartment/${apartmentCode}`);
+    const rawData = response.data;
+    
+    const mappedItems: UnpaidItem[] = rawData.map((item: any) => ({
+      id: item.id.toString(),
+      feeType: item.feeType,
+      description: item.description,
+      amount: Number(item.amount),
+  
+  // Mapping object invoice lồng bên trong
+  invoiceNo: item.invoice ? {
+    id: item.invoice.id.toString(),
+    invoiceCode: item.invoice.invoiceCode,
+    period: new Date(item.invoice.periodDate).toISOString().slice(0, 7), // Lấy định dạng YYYY-MM
+    dueDate: new Date(item.invoice.dueDate),
+    paidAmount: Number(item.invoice.paidAmount),
+    // Nếu có join thêm apartment từ invoice
+    apartment: item.invoice.apartment ? {
+       id: item.invoice.apartment.id,
+       apartmentCode: item.invoice.apartment.code
+    } : undefined
+  } : undefined
+    }));
+
+    // Lọc: Chỉ giữ lại những item có paidAmount != 0
+    const filteredItems = mappedItems.filter(item => item.invoiceNo.paidAmount !== 0);
+    
+    // Gán dữ liệu nhận được vào state để render
+    setUnpaidItems(filteredItems);
+    setSearchResult(filteredItems);
+  } catch (error: any) {
+    console.error("Lỗi khi tìm kiếm:", error);
+    setUnpaidItems([]); // Xóa dữ liệu cũ nếu tìm lỗi
+    
+    if (error.response?.status === 404) {
+      alert(`Không tìm thấy dữ liệu cho căn hộ: ${apartmentCode}`);
+    } else {
+      alert("Có lỗi xảy ra khi kết nối tới máy chủ.");
+    }
+  } 
+};
+
+  // Lọc items theo kỳ được chọn
+  const filteredItems = selectedPeriod === 'ALL' 
+    ? unpaidItems 
+    : unpaidItems.filter(item => item.invoiceNo.period === selectedPeriod);
+
+  // Tính tổng tiền của tất cả khoản đã lọc
+  const totalAmount = filteredItems.reduce((sum, item) => sum + item.amount, 0);
+
+  const handlePrintReceipt = () => {
+    if (filteredItems.length === 0) {
+      alert('Không có khoản nào để thanh toán');
+      return;
+    }
+
+    if (!amountReceived || parseFloat(amountReceived) <= 0) {
+      alert('Vui lòng nhập số tiền nhận được');
+      return;
+    }
+
+    // Show success message
+    setShowSuccess(true);
+    
+    // Reset form after 2 seconds
+    setTimeout(() => {
+      setShowSuccess(false);
+      setApartmentCode('');
+      setSelectedPeriod('ALL');
+      setSearchResult(null);
+      setUnpaidItems([]);
+      setAmountReceived('');
+      setNote('');
+    }, 2000);
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6 flex items-center gap-4">
+        <button
+          onClick={onBack}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        </button>
+        <div>
+          <h1 className="text-3xl text-gray-900">Ghi Nhận Thu & In Phiếu Thu</h1>
+          <p className="text-gray-600">Tra cứu và ghi nhận thanh toán từ cư dân</p>
+        </div>
+      </div>
+
+      {/* Search Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 className="text-xl text-gray-900 mb-4">Tra Cứu Căn Hộ</h2>
+        <div className="flex gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Nhập mã căn hộ (VD: A-101, B-202...)"
+              value={apartmentCode}
+              onChange={(e) => setApartmentCode(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Search className="w-5 h-5" />
+            Tra Cứu
+          </button>
+        </div>
+      </div>
+
+      {/* Unpaid Items */}
+      {searchResult && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl text-gray-900">
+                Danh Sách Khoản Chưa Thanh Toán - {apartmentCode}
+              </h2>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-gray-600" />
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ALL">Tất cả kỳ</option>
+                  <option value="2024-12">Tháng 12/2024</option>
+                  <option value="2024-11">Tháng 11/2024</option>
+                  <option value="2024-10">Tháng 10/2024</option>
+                </select>
+              </div>
+            </div>
+            <span className="text-sm text-gray-600">
+              Tổng nợ: <span className="text-red-600">{formatCurrency(totalAmount)}</span>
+            </span>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            {filteredItems.map((item) => (
+              <div
+                key={item.id}
+                className="p-4 rounded-lg border-2 border-gray-200 bg-gray-50"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-gray-900">{item.feeType}</p>
+                    <p className="text-sm text-gray-600">{item.description}</p>
+                    <p className="text-xs text-gray-500 mt-1">Số hóa đơn: {item.invoiceNo.invoiceCode}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg text-gray-900">{formatCurrency(item.amount)}</p>
+                    <p className="text-xs text-orange-600">Hạn: {item.invoiceNo.dueDate.toLocaleDateString('vi-VN')}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Total Summary */}
+          {filteredItems.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">
+                  Tổng {filteredItems.length} khoản chưa thanh toán
+                </span>
+                <span className="text-xl text-blue-600">
+                  Tổng: {formatCurrency(totalAmount)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Form */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg text-gray-900 mb-4">Thông Tin Thanh Toán</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Số Tiền Nhận Được <span className="text-red-600">*</span>
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="number"
+                    placeholder="Nhập số tiền..."
+                    value={amountReceived}
+                    onChange={(e) => setAmountReceived(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                {amountReceived && parseFloat(amountReceived) > totalAmount && (
+                  <p className="text-sm text-orange-600 mt-1">
+                    Tiền thừa: {formatCurrency(parseFloat(amountReceived) - totalAmount)}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Phương Thức Thanh Toán <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="CASH">Tiền mặt</option>
+                  <option value="TRANSFER">Chuyển khoản</option>
+                  <option value="CARD">Thẻ</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm text-gray-700 mb-2">Ghi Chú</label>
+              <textarea
+                placeholder="Nhập ghi chú (tùy chọn)..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={onBack}
+                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handlePrintReceipt}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <Printer className="w-5 h-5" />
+                In Phiếu Thu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!searchResult && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 text-lg mb-2">Nhập mã căn hộ để tra cứu</p>
+          <p className="text-gray-400 text-sm">
+            Hệ thống sẽ hiển thị danh sách các khoản phí chưa thanh toán
+          </p>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-10 h-10 text-green-600" />
+            </div>
+            <h3 className="text-2xl text-gray-900 mb-2">Ghi Nhận Thành Công!</h3>
+            <p className="text-gray-600 mb-4">Phiếu thu đã được in</p>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">Căn hộ: <span className="text-gray-900">{apartmentCode}</span></p>
+              <p className="text-sm text-gray-600">Số tiền: <span className="text-green-600">{formatCurrency(parseFloat(amountReceived || '0'))}</span></p>
+              <p className="text-sm text-gray-600">Phương thức: <span className="text-gray-900">
+                {paymentMethod === 'CASH' ? 'Tiền mặt' : paymentMethod === 'TRANSFER' ? 'Chuyển khoản' : 'Thẻ'}
+              </span></p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
