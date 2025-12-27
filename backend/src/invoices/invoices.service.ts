@@ -37,4 +37,25 @@ export class InvoicesService {
 
     return invoices;
   }
+
+  async updatePaidAmount(id: string, paidAmount: number): Promise<Invoice> {
+    // 1. Tìm hóa đơn theo ID
+    // Dùng parseInt vì ID từ Param thường là string, nhưng DB thường là number
+    const invoice = await this.invoiceRepository.findOne({ 
+      where: { id: parseInt(id) } 
+    });
+
+    // 2. Nếu không tìm thấy, ném lỗi 404 để Backend phản hồi lại cho Frontend
+    if (!invoice) {
+      throw new NotFoundException(`Không tìm thấy hóa đơn với ID: ${id}`);
+    }
+
+    // 3. Cập nhật giá trị paidAmount
+    // Bạn có thể chọn logic: Gán đè (invoice.paidAmount = paidAmount)
+    // Hoặc Cộng dồn (invoice.paidAmount += paidAmount)
+    invoice.paidAmount = paidAmount;
+
+    // 4. Lưu lại bản ghi đã cập nhật vào Database
+    return await this.invoiceRepository.save(invoice);
+  }
 }
