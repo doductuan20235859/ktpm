@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { ArrowLeft, Search, DollarSign, Printer, CheckCircle, Calendar, Eye, X } from 'lucide-react';
+import axios from 'axios';
 
 interface InvoiceItem {
   id: string;
+  invoiceID: number;
   feeType: string;
   description: string;
   amount: number;
@@ -10,13 +12,18 @@ interface InvoiceItem {
 
 interface Invoice {
   id: string;
-  invoiceNo: string;
+  totalAmount: number; 
+  invoiceCode: string;
   period: string;
-  totalAmount: number;
+  dueDate: Date;
+  // Bạn có thể thêm apartment ở đây nếu backend trả về cả thông tin căn hộ lồng trong invoice
+  apartment?: {
+    id: string;
+    apartmentCode: string;
+  };
   paidAmount: number;
-  dueDate: string;
   selected: boolean;
-  items: InvoiceItem[];
+  items?: InvoiceItem[];
 }
 
 interface ReceiptEntryProps {
@@ -34,6 +41,8 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
   const [note, setNote] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
+  const [hasError, setHasError] = useState(false); // Trạng thái lỗi
+  const [loading, setLoading] = useState(false);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -42,57 +51,59 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
     }).format(value);
   };
 
-  const handleSearch = () => {
-    // Mock data for search result
-    const mockInvoices: Invoice[] = [
-      {
-        id: '1',
-        invoiceNo: 'INV-2024-12-002',
-        period: '2024-12',
-        totalAmount: 3250000,
-        paidAmount: 0,
-        dueDate: '15/12/2024',
-        selected: false,
-        items: [
-          { id: '1', feeType: 'Phí quản lý', description: 'Phí quản lý tháng 12/2024', amount: 1500000 },
-          { id: '2', feeType: 'Dịch vụ', description: 'Phí dịch vụ chung cư', amount: 950000 },
-          { id: '3', feeType: 'Giữ xe', description: 'Phí giữ xe ô tô + xe máy', amount: 800000 },
-        ],
-      },
-      {
-        id: '2',
-        invoiceNo: 'INV-2024-11-045',
-        period: '2024-11',
-        totalAmount: 2800000,
-        paidAmount: 0,
-        dueDate: '15/11/2024',
-        selected: false,
-        items: [
-          { id: '4', feeType: 'Phí quản lý', description: 'Phí quản lý tháng 11/2024', amount: 1500000 },
-          { id: '5', feeType: 'Dịch vụ', description: 'Phí dịch vụ chung cư', amount: 800000 },
-          { id: '6', feeType: 'Giữ xe', description: 'Phí giữ xe ô tô', amount: 500000 },
-        ],
-      },
-      {
-        id: '3',
-        invoiceNo: 'INV-2024-10-032',
-        period: '2024-10',
-        totalAmount: 2550000,
-        paidAmount: 0,
-        dueDate: '15/10/2024',
-        selected: false,
-        items: [
-          { id: '7', feeType: 'Phí quản lý', description: 'Phí quản lý tháng 10/2024', amount: 1500000 },
-          { id: '8', feeType: 'Dịch vụ', description: 'Phí dịch vụ chung cư', amount: 750000 },
-          { id: '9', feeType: 'Giữ xe', description: 'Phí giữ xe xe máy', amount: 300000 },
-        ],
-      },
-    ];
-
+  const handleSearch = async (apartmentCode: string) => {
+    setLoading(true);
+    setHasError(false);
     setSearchedApartmentCode(apartmentCode); // Lưu mã căn hộ đã tìm kiếm
-    setInvoices(mockInvoices);
-    setSearchResult(mockInvoices);
-  };
+    setInvoices([]);
+
+  try {
+    const response = await axios.get(`http://localhost:3001/invoices/apartment/${apartmentCode}`);
+    const rawData = response.data;
+
+    const mappedInvoices: Invoice[] = rawData.map((inv: any) => ({
+      id: inv.id.toString(),
+      invoiceCode: inv.invoiceCode,
+      // Chuyển đổi periodDate (2024-12-01) thành định dạng Tháng/Năm hoặc giữ nguyên
+      period: inv.periodDate.substring(0, 7),
+      dueDate: new Date(inv.dueDate),
+      // Backend trả về chuỗi "2155000.00", cần ép kiểu về Number
+      totalAmount: Number(inv.totalAmount),
+      paidAmount: Number(inv.paidAmount),
+      selected: false, // Mặc định chưa chọn khi mới load
+      
+      // Map thông tin căn hộ
+      apartment: inv.apartment ? {
+        id: inv.apartment.id.toString(),
+        apartmentCode: inv.apartment.code // Backend dùng 'code', interface dùng 'apartmentCode'
+      } : undefined,
+
+      // Map danh sách items bên trong invoice
+      items: inv.items ? inv.items.map((item: any) => ({
+        id: item.id.toString(),
+        invoiceID: item.invoiceId, // Chú ý chữ 'd' thường/hoa (invoiceId vs invoiceID)
+        feeType: item.feeType,
+        description: item.description,
+        amount: Number(item.amount)
+      })) : []
+    }));
+    
+    // Lọc: Chỉ giữ lại những item có paidAmount != 0
+    const filteredItems = mappedInvoices.filter(item => item.paidAmount < item.totalAmount);
+    
+    // Gán dữ liệu nhận được vào state để render
+    setInvoices(filteredItems);
+    setSearchResult(filteredItems);
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      setHasError(true); // Kích hoạt trạng thái không tìm thấy dữ liệu
+    } else {
+      alert("Có lỗi kết nối hệ thống. Vui lòng thử lại!");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const toggleInvoiceSelection = (id: string) => {
     setInvoices(
@@ -164,12 +175,12 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
               placeholder="Nhập mã căn hộ (VD: A-101, B-202...)"
               value={apartmentCode}
               onChange={(e) => setApartmentCode(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch(apartmentCode)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch(apartmentCode)}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             <Search className="w-5 h-5" />
@@ -186,7 +197,7 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
               <h2 className="text-xl text-gray-900">
                 Danh Sách Hóa Đơn Chưa Thanh Toán - {searchedApartmentCode}
               </h2>
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-gray-600" />
                 <select
                   value={selectedPeriod}
@@ -198,13 +209,25 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
                   <option value="2024-11">Tháng 11/2024</option>
                   <option value="2024-10">Tháng 10/2024</option>
                 </select>
-              </div>
+              </div> */}
             </div>
             <span className="text-sm text-gray-600">
               Tổng nợ tất cả: <span className="text-red-600">{formatCurrency(filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount - inv.paidAmount), 0))}</span>
             </span>
           </div>
 
+          {loading && <p className="text-center">Đang tra cứu dữ liệu...</p>}
+
+          {!loading && hasError && (
+    <div className="bg-yellow-50 border border-yellow-200 p-4 rounded text-center">
+      <p className="text-yellow-700 font-medium">
+        Không tìm thấy hóa đơn nào cho mã căn hộ này!
+      </p>
+      <p className="text-sm text-yellow-600">Vui lòng kiểm tra lại mã bạn đã nhập.</p>
+    </div>
+  )}
+
+  {!loading && !hasError && invoices.length > 0 && (
           <div className="space-y-3 mb-6">
             {filteredInvoices.map((invoice) => (
               <div
@@ -225,9 +248,9 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="text-gray-900">Số hóa đơn: {invoice.invoiceNo}</p>
+                      <p className="text-gray-900">Số hóa đơn: {invoice.invoiceCode}</p>
                       <p className="text-sm text-gray-600">Kỳ thanh toán: {invoice.period}</p>
-                      <p className="text-xs text-orange-600 mt-1">Hạn thanh toán: {invoice.dueDate}</p>
+                      <p className="text-xs text-orange-600 mt-1">Hạn thanh toán: {invoice.dueDate.toLocaleDateString('vi-VN')}</p>
                     </div>
                     <div className="text-right flex items-start gap-3">
                       <div>
@@ -251,6 +274,7 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
               </div>
             ))}
           </div>
+        )}
 
           {/* Total Summary */}
           {selectedInvoices.length > 0 && (
@@ -377,7 +401,7 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
               <div>
                 <h3 className="text-2xl text-white">Chi Tiết Hóa Đơn</h3>
-                <p className="text-sm text-blue-100 mt-1">{selectedInvoiceDetail.invoiceNo}</p>
+                <p className="text-sm text-blue-100 mt-1">{selectedInvoiceDetail.invoiceCode}</p>
               </div>
               <button
                 onClick={() => setSelectedInvoiceDetail(null)}
@@ -393,7 +417,7 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
               <div className="grid grid-cols-3 gap-4 mb-6 bg-gray-50 p-4 rounded-lg">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Số hóa đơn</p>
-                  <p className="text-sm text-gray-900">{selectedInvoiceDetail.invoiceNo}</p>
+                  <p className="text-sm text-gray-900">{selectedInvoiceDetail.invoiceCode}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Kỳ thanh toán</p>
@@ -401,14 +425,14 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Hạn thanh toán</p>
-                  <p className="text-sm text-orange-600">{selectedInvoiceDetail.dueDate}</p>
+                  <p className="text-sm text-orange-600">{selectedInvoiceDetail.dueDate.toLocaleDateString('vi-VN')}</p>
                 </div>
               </div>
 
               {/* Items List */}
               <h4 className="text-lg text-gray-900 mb-4">Danh sách các khoản phí</h4>
               <div className="space-y-3 mb-6">
-                {selectedInvoiceDetail.items.map((item) => (
+                {selectedInvoiceDetail.items?.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"

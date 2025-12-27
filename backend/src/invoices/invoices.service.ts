@@ -1,5 +1,5 @@
 // invoices.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice } from './entities/invoice.entity';
@@ -14,7 +14,27 @@ export class InvoicesService {
   // Hàm lấy tất cả hóa đơn
   findAll(): Promise<Invoice[]> {
     return this.invoiceRepository.find({
-  relations: ['apartment'], // Thêm dòng này để lấy thông tin căn hộ
+  relations: {
+      apartment: true,
+      items: true,
+      // Nếu muốn lấy thêm thông tin lồng trong items:
+      // items: { someOtherRelation: true } 
+    },
 });
+  }
+
+  async findByApartmentCode(code: string): Promise<Invoice[]> {
+    const invoices = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.apartment', 'apartment') // Lấy thông tin căn hộ
+      .leftJoinAndSelect('invoice.items', 'items')       // Lấy các hạng mục phí (nếu cần)
+      .where('apartment.code = :code', { code }) // Lọc theo mã căn hộ
+      .getMany();
+
+    if (!invoices || invoices.length === 0) {
+      throw new NotFoundException(`Không tìm thấy hóa đơn nào cho căn hộ ${code}`);
+    }
+
+    return invoices;
   }
 }
