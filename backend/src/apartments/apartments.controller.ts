@@ -7,11 +7,11 @@ import { UpdateApartmentDto } from './dto/update-apartment.dto';
 export class ApartmentsController {
   constructor(private readonly apartmentsService: ApartmentsService) {}
 
-  @Post()
-  create(@Body() createApartmentDto: CreateApartmentDto) {
-    return this.apartmentsService.create(createApartmentDto);
-  }
-
+  @Post('create')
+create(@Body() createApartmentDto: CreateApartmentDto) {
+  console.log('📦 CreateApartmentDto:', createApartmentDto);
+  return this.apartmentsService.create(createApartmentDto);
+}
   @Get()
   findAll() {
     return this.apartmentsService.findAll();

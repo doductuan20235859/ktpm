@@ -25,14 +25,17 @@ export class Apartment {
   @Column({ name: 'building_name', length: 50 })
   buildingName: string;
 
-  @Column({ name: 'floor_number', nullable: true })
+  @Column({ name: 'unit_number', length: 20, nullable: true })
+  unitNumber: string;
+
+  @Column({ name: 'floor_number', default: 1 })
   floorNumber: number;
 
   @Column('decimal', {
     name: 'area_sqm',
     precision: 10,
     scale: 2,
-    nullable: true,
+    default: 0,
   })
   areaSqm: number;
 
@@ -43,6 +46,7 @@ export class Apartment {
   })
   status: ApartmentStatus;
 
+  // ===== OWNER =====
   @Column({ name: 'owner_id', nullable: true })
   ownerId: number;
 
@@ -55,7 +59,7 @@ export class Apartment {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  // Relations
+  // ===== RELATIONS (BẮT BUỘC PHẢI CÓ) =====
   @OneToMany(() => ApartmentResident, (res) => res.apartment)
   residents: ApartmentResident[];
 
