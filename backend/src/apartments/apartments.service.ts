@@ -39,7 +39,7 @@ export class ApartmentsService {
 
     const apartment = this.apartmentRepository.create({
       code,
-      buildingName,
+      buildingName: `Tòa ${buildingName}`,
       unitNumber,
       floorNumber,
       areaSqm,
