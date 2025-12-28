@@ -26,20 +26,23 @@ export class Vehicle {
   @Column({ type: 'enum', enum: VehicleType })
   type: VehicleType;
 
-  @Column({ length: 50, nullable: true })
-  brand: string;
+  // --- SỬA LỖI TẠI ĐÂY ---
+  // Thêm "type: 'varchar'" để TypeORM biết chính xác kiểu dữ liệu DB
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  brand: string | null;
 
-  @Column({ name: 'plate_number', length: 20, unique: true })
+  @Column({ name: 'plate_number', type: 'varchar', length: 20, unique: true })
   plateNumber: string;
 
-  @Column({ length: 30, nullable: true })
-  color: string;
+  // Thêm "type: 'varchar'" cho color luôn để tránh lỗi tương tự
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  color: string | null;
 
   @Column({ name: 'photo_url', type: 'text', nullable: true })
-  photoUrl: string;
+  photoUrl: string | null;
 
   @Column({ name: 'registration_doc_url', type: 'text', nullable: true })
-  registrationDocUrl: string;
+  registrationDocUrl: string | null;
 
   @Column({ type: 'enum', enum: VehicleStatus, default: VehicleStatus.PENDING })
   status: VehicleStatus;

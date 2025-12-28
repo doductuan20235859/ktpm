@@ -1,34 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Get } from '@nestjs/common';
 import { RequestsService } from './requests.service';
 import { CreateRequestDto } from './dto/create-request.dto';
-import { UpdateRequestDto } from './dto/update-request.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('requests')
+@UseGuards(JwtAuthGuard) // Bắt buộc đăng nhập
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
   @Post()
-  create(@Body() createRequestDto: CreateRequestDto) {
-    return this.requestsService.create(createRequestDto);
+  create(@Req() req, @Body() createRequestDto: CreateRequestDto) {
+    // req.user chứa thông tin từ JwtStrategy (userId, role, apartmentId...)
+    return this.requestsService.create(req.user, createRequestDto);
   }
 
-  @Get()
-  findAll() {
-    return this.requestsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.requestsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateRequestDto: UpdateRequestDto) {
-    return this.requestsService.update(+id, updateRequestDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.requestsService.remove(+id);
+  @Get('my-requests')
+  findAllMyRequests(@Req() req) {
+    return this.requestsService.findAllMyRequests(req.user.userId);
   }
 }

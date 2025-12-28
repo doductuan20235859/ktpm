@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Bell,
   DollarSign,
@@ -16,11 +16,14 @@ import {
   Download,
   Printer,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { InvoiceDetailModal } from "@/components/shared/InvoiceDetailModal";
 import { VehicleRegistrationModal } from "@/components/shared/VehicleRegistrationModal";
 import { VehicleDetailModal } from "@/components/shared/VehicleDetailModal";
+import { toast } from "sonner";
 
+// --- INTERFACES ---
 interface Notification {
   id: string;
   title: string;
@@ -62,17 +65,33 @@ interface Vehicle {
   plate: string;
   type: "car" | "motorcycle";
   color: string;
+  brand: string;
+  status: string;
+  photoUrl?: string;
+  registrationDocUrl?: string;
+  createdAt?: string;
 }
 
-interface MyRequest {
-  id: string;
+interface RequestItem {
+  id: number;
   ticketCode: string;
   title: string;
-  status: "NEW" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
   createdDate: string;
+  status: string;
+  category: string;
+}
+
+interface UserData {
+  id: number;
+  fullName: string;
+  phoneNumber: string;
+  role: string;
+  apartmentCode: string;
+  apartmentId: number;
 }
 
 export default function ResidentPortal() {
+  // --- STATE QUẢN LÝ UI ---
   const [showNewRequestForm, setShowNewRequestForm] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
@@ -81,16 +100,34 @@ export default function ResidentPortal() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPaymentDetailModal, setShowPaymentDetailModal] = useState(false);
   const [showVehicleDetailModal, setShowVehicleDetailModal] = useState(false);
+
+  // --- STATE DATA & LOADING ---
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
+
+  const [myRequests, setMyRequests] = useState<RequestItem[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
-  const [profileData, setProfileData] = useState({
-    name: "Nguyễn Văn An",
-    email: "nguyenvanan@email.com",
-    phone: "0987654321",
-    idCard: "012345678901",
-    dateOfBirth: "01/01/1985",
-    apartmentNumber: "A-101",
-    role: "Chủ hộ",
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+
+  // --- STATE FORMS ---
+  const [requestForm, setRequestForm] = useState({
+    title: "",
+    category: "OTHER",
+    description: "",
   });
+
+  const [profileData, setProfileData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    idCard: "",
+    dateOfBirth: "",
+    apartmentNumber: "",
+    role: "Cư dân",
+  });
+
   const [vehicleForm, setVehicleForm] = useState({
     ownerName: "",
     apartmentNumber: "",
@@ -106,30 +143,325 @@ export default function ResidentPortal() {
     contractDoc: null as File | null,
   });
 
-  // Mock data
+  // --- LOAD USER DATA FROM LOCALSTORAGE ---
+  useEffect(() => {
+    const userDataStr = localStorage.getItem("userData");
+    if (userDataStr) {
+      try {
+        const userData: UserData = JSON.parse(userDataStr);
+        setCurrentUser(userData);
+
+        // Cập nhật profile data
+        setProfileData({
+          name: userData.fullName,
+          email: "",
+          phone: userData.phoneNumber,
+          idCard: "",
+          dateOfBirth: "",
+          apartmentNumber: userData.apartmentCode,
+          role: userData.role === "RESIDENT" ? "Cư dân" : "Chủ hộ",
+        });
+
+        // Cập nhật vehicle form
+        setVehicleForm((prev) => ({
+          ...prev,
+          ownerName: userData.fullName,
+          apartmentNumber: userData.apartmentCode,
+          phone: userData.phoneNumber,
+        }));
+      } catch (error) {
+        console.error("Lỗi parse user data:", error);
+        toast.error("Không thể tải thông tin người dùng");
+      }
+    }
+  }, []);
+
+  // --- API CALLS ---
+
+  // 1. Lấy danh sách yêu cầu
+  const fetchMyRequests = async () => {
+    try {
+      setIsLoadingRequests(true);
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch("http://localhost:3001/requests/my-requests", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const mappedData = data.map((item: any) => ({
+          id: item.id,
+          ticketCode: item.ticketCode,
+          title: item.title,
+          createdDate: new Date(item.createdAt).toLocaleDateString("vi-VN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          status: item.status,
+          category: item.category,
+        }));
+        setMyRequests(mappedData);
+      }
+    } catch (error) {
+      console.error("Lỗi tải danh sách yêu cầu:", error);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
+  // 2. Lấy danh sách xe
+  const fetchMyVehicles = async () => {
+    try {
+      setIsLoadingVehicles(true);
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch("http://localhost:3001/vehicles/my-vehicles", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const mappedData = data.map((item: any) => ({
+          id: item.id,
+          plate: item.plateNumber,
+          type: item.type === "CAR" ? "car" : "motorcycle",
+          color: item.color,
+          brand: item.brand,
+          status: item.status,
+          photoUrl: item.photoUrl,
+          registrationDocUrl: item.registrationDocUrl,
+          createdAt: item.createdAt,
+        }));
+        setVehicles(mappedData);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy danh sách xe:", error);
+    } finally {
+      setIsLoadingVehicles(false);
+    }
+  };
+
+  // 3. Gửi yêu cầu mới
+  const handleSubmitRequest = async () => {
+    if (!requestForm.title.trim() || !requestForm.description.trim()) {
+      toast.error("Vui lòng điền đầy đủ tiêu đề và mô tả");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const token = localStorage.getItem("accessToken");
+
+      const res = await fetch("http://localhost:3001/requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: requestForm.title,
+          category: requestForm.category,
+          description: requestForm.description,
+          priority: "NORMAL",
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Gửi yêu cầu thất bại");
+      }
+
+      const data = await res.json();
+      toast.success(`Gửi yêu cầu thành công! Mã: ${data.ticketCode}`);
+
+      // Reset form
+      setRequestForm({ title: "", category: "OTHER", description: "" });
+      setShowNewRequestForm(false);
+      setShowMyRequests(true);
+      fetchMyRequests();
+    } catch (error) {
+      console.error(error);
+      toast.error("Có lỗi xảy ra khi gửi yêu cầu");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 4. Gửi đăng ký xe mới
+  const handleSubmitVehicle = async () => {
+    // Validation
+    if (!vehicleForm.plate.trim()) {
+      toast.error("Vui lòng nhập biển số xe");
+      return;
+    }
+    if (!vehicleForm.brand.trim()) {
+      toast.error("Vui lòng nhập thương hiệu xe");
+      return;
+    }
+    if (!vehicleForm.color) {
+      toast.error("Vui lòng chọn màu xe");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const token = localStorage.getItem("accessToken");
+
+      const formData = new FormData();
+
+      // Chuẩn hóa biển số (uppercase, trim)
+      const plateNumber = vehicleForm.plate.trim().toUpperCase();
+      formData.append("plateNumber", plateNumber);
+
+      // Map vehicleCategory sang type backend expect
+      const vehicleType =
+        vehicleForm.vehicleCategory === "car" ? "CAR" : "MOTORCYCLE";
+      formData.append("type", vehicleType);
+
+      formData.append("brand", vehicleForm.brand.trim());
+      formData.append("color", vehicleForm.color);
+
+      // Append files (chỉ append nếu có file)
+      if (vehicleForm.vehiclePhoto) {
+        formData.append("vehiclePhoto", vehicleForm.vehiclePhoto);
+      }
+      if (vehicleForm.registrationDoc) {
+        formData.append("registrationDoc", vehicleForm.registrationDoc);
+      }
+      if (vehicleForm.idCard) {
+        formData.append("idCard", vehicleForm.idCard);
+      }
+      if (vehicleForm.contractDoc) {
+        formData.append("contractDoc", vehicleForm.contractDoc);
+      }
+
+      const res = await fetch("http://localhost:3001/vehicles", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Đăng ký xe thất bại");
+      }
+
+      const responseData = await res.json();
+
+      toast.success(
+        `Đăng ký xe ${responseData.plateNumber} thành công! Trạng thái: ${
+          responseData.status === "PENDING" ? "Chờ duyệt" : responseData.status
+        }`
+      );
+
+      // Reset form - chỉ reset các field liên quan đến xe
+      setVehicleForm((prev) => ({
+        ...prev,
+        vehicleCategory: "motorcycle" as "car" | "motorcycle",
+        vehicleType: "",
+        plate: "",
+        brand: "",
+        color: "",
+        vehiclePhoto: null,
+        registrationDoc: null,
+        idCard: null,
+        contractDoc: null,
+      }));
+
+      setShowVehicleForm(false);
+      fetchMyVehicles();
+    } catch (error: any) {
+      console.error("Lỗi đăng ký xe:", error);
+      toast.error(error.message || "Có lỗi xảy ra khi đăng ký xe");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 5. ✅ XEM CHI TIẾT XE - Gọi API để lấy full data
+  const handleViewVehicle = async (vehicle: Vehicle) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch(`http://localhost:3001/vehicles/${vehicle.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const detailData = await res.json();
+        setSelectedVehicle({
+          ...detailData,
+          plate: detailData.plateNumber,
+          type: detailData.type === "CAR" ? "car" : "motorcycle",
+        });
+        setShowVehicleDetailModal(true);
+      } else {
+        toast.error("Không thể tải thông tin xe");
+      }
+    } catch (error) {
+      console.error("Lỗi tải chi tiết xe:", error);
+      toast.error("Có lỗi xảy ra khi tải thông tin xe");
+    }
+  };
+
+  // 6. ✅ XÓA XE - GỌI API DELETE
+  const handleDeleteVehicle = async (id: string) => {
+    if (!window.confirm("Bạn chắc chắn muốn xóa phương tiện này?")) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        toast.error("Vui lòng đăng nhập lại");
+        return;
+      }
+
+      console.log("[DELETE] Sending request for vehicle ID:", id);
+
+      const res = await fetch(`http://localhost:3001/vehicles/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("[DELETE] Response status:", res.status);
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log("[DELETE] Success:", data);
+        toast.success(data.message || "Xóa xe thành công");
+
+        // Refresh danh sách sau khi xóa thành công
+        await fetchMyVehicles();
+      } else {
+        const errorData = await res.json();
+        console.error("[DELETE] Error response:", errorData);
+        toast.error(errorData.message || "Xóa xe thất bại");
+      }
+    } catch (error) {
+      console.error("[DELETE] Exception:", error);
+      toast.error("Có lỗi xảy ra khi xóa xe");
+    }
+  };
+
+  // --- USE EFFECT ---
+  useEffect(() => {
+    fetchMyRequests();
+    fetchMyVehicles();
+  }, []);
+
+  // --- MOCK DATA & HELPERS ---
   const notifications: Notification[] = [
     {
       id: "1",
       title: "Thông báo thu phí tháng 12/2024",
-      content:
-        "Kính gửi quý cư dân, Ban quản lý thông báo phí quản lý tháng 12/2024 đã được phát hành. Vui lòng thanh toán trước ngày 20/12/2024.",
+      content: "Kính gửi quý cư dân, Ban quản lý thông báo phí quản lý...",
       date: "10/12/2024",
-      type: "info",
-    },
-    {
-      id: "2",
-      title: "Tạm ngưng cấp nước",
-      content:
-        "Ngày 15/12/2024 từ 8h-12h sẽ tạm ngưng cấp nước để vệ sinh bể nước. Vui lòng dự trữ nước sử dụng.",
-      date: "12/12/2024",
-      type: "warning",
-    },
-    {
-      id: "3",
-      title: "Thông báo nội quy mới về giữ xe",
-      content:
-        "Từ ngày 01/01/2025, mọi phương tiện ra vào phải quét thẻ. Vui lòng đăng ký thẻ tại văn phòng BQL.",
-      date: "13/12/2024",
       type: "info",
     },
   ];
@@ -142,89 +474,7 @@ export default function ResidentPortal() {
       status: "unpaid",
       dueDate: "20/12/2024",
     },
-    {
-      id: "2",
-      period: "11/2024",
-      amount: 3250000,
-      status: "paid",
-      dueDate: "20/11/2024",
-    },
-    {
-      id: "3",
-      period: "10/2024",
-      amount: 3250000,
-      status: "paid",
-      dueDate: "20/10/2024",
-    },
-    {
-      id: "4",
-      period: "09/2024",
-      amount: 3250000,
-      status: "paid",
-      dueDate: "20/09/2024",
-    },
   ];
-
-  const vehicles: Vehicle[] = [
-    { id: "1", plate: "29A-12345", type: "car", color: "Đen" },
-    { id: "2", plate: "29B1-67890", type: "motorcycle", color: "Đỏ" },
-  ];
-
-  // Mock detailed vehicle data
-  const getVehicleDetail = (vehicle: Vehicle) => {
-    // This would normally fetch from API
-    return {
-      ...vehicle,
-      vehicleType: vehicle.type === "car" ? "Sedan" : "Tay ga",
-      brand: vehicle.type === "car" ? "Toyota" : "Honda",
-      ownerName: "Nguyễn Văn An",
-      apartmentNumber: "A-101",
-      phone: "0987654321",
-      color: vehicle.color === "Đen" ? "black" : "red",
-      registrationDate: "01/01/2024",
-      status: "active" as "active" | "pending" | "expired",
-      vehiclePhoto: undefined,
-      registrationDoc: "registration_doc.pdf",
-      idCard: "id_card.pdf",
-      contractDoc: "contract_doc.pdf",
-    };
-  };
-
-  const handleViewVehicle = (vehicle: Vehicle) => {
-    const detailedVehicle = getVehicleDetail(vehicle);
-    setSelectedVehicle(detailedVehicle);
-    setShowVehicleDetailModal(true);
-  };
-
-  const handleDeleteVehicle = (vehicleId: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa phương tiện này?")) {
-      alert("Phương tiện đã được xóa thành công!");
-      // In real app, would delete from state/database
-    }
-  };
-
-  const myRequests: MyRequest[] = [
-    {
-      id: "1",
-      ticketCode: "REQ-2024-007",
-      title: "Đèn hành lang tầng 5 hỏng",
-      status: "IN_PROGRESS",
-      createdDate: "12/12/2024",
-    },
-    {
-      id: "2",
-      ticketCode: "REQ-2024-003",
-      title: "Yêu cầu sửa chữa ổ khóa cửa",
-      status: "RESOLVED",
-      createdDate: "05/12/2024",
-    },
-  ];
-
-  const [requestForm, setRequestForm] = useState({
-    title: "",
-    category: "OTHER",
-    description: "",
-  });
 
   const totalDebt = payments
     .filter((p) => p.status === "unpaid" || p.status === "partial")
@@ -237,41 +487,16 @@ export default function ResidentPortal() {
     }).format(value);
   };
 
-  // Mock invoice data
   const currentInvoice: Invoice = {
     id: "INV-2024-12-A101",
     period: "12/2024",
-    apartmentNumber: "A-101",
-    ownerName: "Nguyễn Văn An",
+    apartmentNumber: profileData.apartmentNumber,
+    ownerName: profileData.name,
     issueDate: "01/12/2024",
     dueDate: "20/12/2024",
     totalAmount: 3250000,
     status: "unpaid",
-    details: [
-      { name: "Phí quản lý", amount: 1500000 },
-      { name: "Phí dịch vụ", amount: 800000 },
-      {
-        name: "Điện",
-        amount: 450000,
-        unit: "kWh",
-        quantity: 180,
-        unitPrice: 2500,
-      },
-      {
-        name: "Nước",
-        amount: 350000,
-        unit: "m³",
-        quantity: 14,
-        unitPrice: 25000,
-      },
-      {
-        name: "Phí gửi xe ô tô",
-        amount: 150000,
-        unit: "xe",
-        quantity: 1,
-        unitPrice: 150000,
-      },
-    ],
+    details: [{ name: "Phí quản lý", amount: 1500000 }],
   };
 
   const getNotificationIcon = (type: string) => {
@@ -281,7 +506,7 @@ export default function ResidentPortal() {
   };
 
   const getStatusBadge = (status: string) => {
-    const styles = {
+    const styles: any = {
       NEW: { bg: "bg-blue-100 text-blue-700", label: "Mới", icon: AlertCircle },
       IN_PROGRESS: {
         bg: "bg-orange-100 text-orange-700",
@@ -293,63 +518,27 @@ export default function ResidentPortal() {
         label: "Đã giải quyết",
         icon: CheckCircle,
       },
+      DONE: {
+        bg: "bg-green-100 text-green-700",
+        label: "Hoàn thành",
+        icon: CheckCircle,
+      },
       CLOSED: {
         bg: "bg-gray-100 text-gray-700",
         label: "Đã đóng",
         icon: CheckCircle,
       },
     };
-    return styles[status as keyof typeof styles] || styles.NEW;
+    return styles[status] || styles.NEW;
   };
 
-  const handleSubmitRequest = () => {
-    if (!requestForm.title || !requestForm.description) {
-      alert("Vui lòng điền đầy đủ thông tin");
-      return;
-    }
-    alert(
-      "Gửi yêu cầu thành công! Chúng tôi sẽ xử lý trong thời gian sớm nhất."
-    );
-    setRequestForm({ title: "", category: "OTHER", description: "" });
-    setShowNewRequestForm(false);
-  };
-
-  const handleSubmitVehicle = () => {
-    if (
-      !vehicleForm.ownerName ||
-      !vehicleForm.apartmentNumber ||
-      !vehicleForm.phone ||
-      !vehicleForm.plate ||
-      !vehicleForm.vehicleType ||
-      !vehicleForm.brand ||
-      !vehicleForm.color
-    ) {
-      alert("Vui lòng điền đầy đủ thông tin bắt buộc");
-      return;
-    }
-    alert("Đăng ký xe thành công! Ban quản lý sẽ xem xét và phê duyệt.");
-    setVehicleForm({
-      ownerName: "",
-      apartmentNumber: "",
-      phone: "",
-      vehicleCategory: "motorcycle",
-      vehicleType: "",
-      plate: "",
-      brand: "",
-      color: "",
-      vehiclePhoto: null,
-      registrationDoc: null,
-      idCard: null,
-      contractDoc: null,
-    });
-    setShowVehicleForm(false);
-  };
-
-  const handleFileChange = (
-    field: "registrationDoc" | "idCard" | "contractDoc" | "vehiclePhoto",
-    file: File | null
-  ) => {
-    setVehicleForm({ ...vehicleForm, [field]: file });
+  const getVehicleStatusLabel = (status: string) => {
+    const statusMap: any = {
+      PENDING: { label: "Chờ duyệt", color: "text-orange-600" },
+      APPROVED: { label: "Đã duyệt", color: "text-green-600" },
+      REJECTED: { label: "Từ chối", color: "text-red-600" },
+    };
+    return statusMap[status] || { label: status, color: "text-gray-600" };
   };
 
   return (
@@ -358,9 +547,11 @@ export default function ResidentPortal() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-3xl text-gray-900 mb-2">
-            Chào mừng, Nguyễn Văn An
+            Chào mừng, {profileData.name || "Cư dân"}
           </h1>
-          <p className="text-gray-600">Căn hộ A-101 | Chủ hộ</p>
+          <p className="text-gray-600">
+            Căn hộ {profileData.apartmentNumber} | {profileData.role}
+          </p>
         </div>
         <button
           onClick={() => setShowProfileModal(true)}
@@ -370,8 +561,8 @@ export default function ResidentPortal() {
             <UserCircle className="w-5 h-5" />
           </div>
           <div className="text-left">
-            <p className="text-sm text-gray-900">Nguyễn Văn An</p>
-            <p className="text-xs text-gray-500">Cập nhật thông tin</p>
+            <p className="text-sm text-gray-900">{profileData.name}</p>
+            <p className="text-xs text-gray-500">Xem thông tin</p>
           </div>
         </button>
       </div>
@@ -380,150 +571,31 @@ export default function ResidentPortal() {
       {showProfileModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl text-gray-900">Thông Tin Cá Nhân</h2>
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={() => setShowProfileModal(false)}>
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6">
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl">
-                    <UserCircle className="w-16 h-16" />
-                  </div>
-                  <button className="absolute bottom-0 right-0 bg-white border-2 border-gray-200 rounded-full p-2 hover:bg-gray-50 transition-colors">
-                    <User className="w-4 h-4 text-gray-600" />
-                  </button>
-                </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Họ tên</p>
+                <p className="text-gray-900 font-medium">{profileData.name}</p>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Họ và Tên <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.name}
-                    onChange={(e) =>
-                      setProfileData({ ...profileData, name: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Email <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) =>
-                      setProfileData({ ...profileData, email: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Số Điện Thoại <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={profileData.phone}
-                    onChange={(e) =>
-                      setProfileData({ ...profileData, phone: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Số CMND/CCCD
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.idCard}
-                    onChange={(e) =>
-                      setProfileData({ ...profileData, idCard: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Ngày Sinh
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.dateOfBirth}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        dateOfBirth: e.target.value,
-                      })
-                    }
-                    placeholder="DD/MM/YYYY"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Số Căn Hộ
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.apartmentNumber}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
-                    disabled
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Vai Trò
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.role}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
-                    disabled
-                  />
-                </div>
-
-                <div className="pt-2 border-t border-gray-200">
-                  <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                    🔒 Đổi Mật Khẩu
-                  </button>
-                </div>
+              <div>
+                <p className="text-sm text-gray-500">Số điện thoại</p>
+                <p className="text-gray-900 font-medium">{profileData.phone}</p>
               </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 sticky bottom-0">
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => {
-                  alert("Cập nhật thông tin thành công!");
-                  setShowProfileModal(false);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Lưu Thay Đổi
-              </button>
+              <div>
+                <p className="text-sm text-gray-500">Căn hộ</p>
+                <p className="text-gray-900 font-medium">
+                  {profileData.apartmentNumber}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Vai trò</p>
+                <p className="text-gray-900 font-medium">{profileData.role}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -575,7 +647,6 @@ export default function ResidentPortal() {
               {showAllNotifications ? "Thu gọn" : "Xem tất cả"}
             </button>
           </div>
-
           <div
             className={`space-y-3 ${
               showAllNotifications ? "max-h-[500px] overflow-y-auto pr-2" : ""
@@ -586,7 +657,7 @@ export default function ResidentPortal() {
               .map((notification) => (
                 <div
                   key={notification.id}
-                  className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4 hover:bg-blue-100 transition-colors"
+                  className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4"
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">
@@ -674,7 +745,7 @@ export default function ResidentPortal() {
           )}
         </div>
 
-        {/* Request Card */}
+        {/* --- REQUEST CARD --- */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl text-gray-900 flex items-center gap-2">
@@ -682,14 +753,17 @@ export default function ResidentPortal() {
               Phản Ánh / Yêu Cầu
             </h2>
             <button
-              onClick={() => setShowMyRequests(!showMyRequests)}
+              onClick={() => {
+                if (!showMyRequests) fetchMyRequests();
+                setShowMyRequests(!showMyRequests);
+                setShowNewRequestForm(false);
+              }}
               className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
               <Eye className="w-4 h-4" />
               {showMyRequests ? "Gửi mới" : "Yêu cầu của tôi"}
             </button>
           </div>
-
           {!showNewRequestForm && !showMyRequests && (
             <div>
               <p className="text-gray-600 mb-4 text-sm">
@@ -705,6 +779,7 @@ export default function ResidentPortal() {
             </div>
           )}
 
+          {/* Form Gửi Yêu Cầu Mới */}
           {showNewRequestForm && (
             <div className="space-y-4">
               <div>
@@ -763,102 +838,142 @@ export default function ResidentPortal() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowNewRequestForm(false)}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleSubmitRequest}
-                  className="flex-1 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  Gửi
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Đang gửi...
+                    </>
+                  ) : (
+                    "Gửi"
+                  )}
                 </button>
               </div>
             </div>
           )}
 
+          {/* Danh Sách Yêu Cầu Của Tôi */}
           {showMyRequests && (
-            <div className="space-y-3">
-              {myRequests.map((request) => {
-                const badge = getStatusBadge(request.status);
-                const Icon = badge.icon;
-                return (
-                  <div
-                    key={request.id}
-                    className="border border-gray-200 rounded-lg p-4"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="text-xs text-blue-600">
-                        {request.ticketCode}
-                      </span>
-                      <span
-                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${badge.bg}`}
-                      >
-                        <Icon className="w-3 h-3" />
-                        {badge.label}
-                      </span>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {isLoadingRequests ? (
+                <div className="flex justify-center py-6 text-gray-500">
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" /> Đang tải...
+                </div>
+              ) : myRequests.length === 0 ? (
+                <p className="text-center text-gray-500 py-4">
+                  Bạn chưa gửi yêu cầu nào.
+                </p>
+              ) : (
+                myRequests.map((request) => {
+                  const badge = getStatusBadge(request.status);
+                  const Icon = badge.icon;
+                  return (
+                    <div
+                      key={request.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                          {request.ticketCode}
+                        </span>
+                        <span
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${badge.bg}`}
+                        >
+                          <Icon className="w-3 h-3" />
+                          {badge.label}
+                        </span>
+                      </div>
+                      <h3 className="text-gray-900 mb-1 font-medium">
+                        {request.title}
+                      </h3>
+                      <div className="flex justify-between items-end">
+                        <p className="text-xs text-gray-500">
+                          Ngày tạo: {request.createdDate}
+                        </p>
+                        <span className="text-xs text-gray-400 border border-gray-200 px-1.5 rounded bg-gray-50">
+                          {request.category}
+                        </span>
+                      </div>
                     </div>
-                    <h3 className="text-gray-900 mb-1">{request.title}</h3>
-                    <p className="text-xs text-gray-500">
-                      Tạo ngày: {request.createdDate}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           )}
         </div>
 
-        {/* Vehicles Card */}
+        {/* --- VEHICLES CARD --- */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-xl text-gray-900 mb-4 flex items-center gap-2">
             <Car className="w-5 h-5 text-green-600" />
             Thông Tin Xe
           </h2>
-
           <div className="space-y-3">
-            {vehicles.map((vehicle) => (
-              <div
-                key={vehicle.id}
-                className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200 group"
-              >
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    vehicle.type === "car" ? "bg-blue-600" : "bg-green-600"
-                  }`}
-                >
-                  <Car className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-gray-900">{vehicle.plate}</p>
-                  <p className="text-sm text-gray-600">
-                    {vehicle.type === "car" ? "Ô tô" : "Xe máy"} - Màu{" "}
-                    {vehicle.color}
-                  </p>
-                </div>
-                <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs flex-shrink-0">
-                  Đã đăng ký
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleViewVehicle(vehicle)}
-                    className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                    title="Xem chi tiết"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteVehicle(vehicle.id)}
-                    className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                    title="Xóa phương tiện"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            {isLoadingVehicles ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="animate-spin text-gray-400" />
               </div>
-            ))}
+            ) : vehicles.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">
+                Chưa có phương tiện nào.
+              </p>
+            ) : (
+              vehicles.map((vehicle) => {
+                const statusInfo = getVehicleStatusLabel(vehicle.status);
+                return (
+                  <div
+                    key={vehicle.id}
+                    className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200"
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        vehicle.type === "car" ? "bg-blue-600" : "bg-green-600"
+                      }`}
+                    >
+                      <Car className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-900 font-bold">{vehicle.plate}</p>
+                      <p className="text-sm text-gray-600 capitalize">
+                        {vehicle.type === "car" ? "Ô tô" : "Xe máy"} -{" "}
+                        {vehicle.brand} - {vehicle.color}
+                      </p>
+                      <p className="text-xs mt-1">
+                        Trạng thái:{" "}
+                        <span className={`${statusInfo.color} font-bold`}>
+                          {statusInfo.label}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleViewVehicle(vehicle)}
+                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                        title="Xem chi tiết"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteVehicle(vehicle.id)}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-
           <button
             onClick={() => setShowVehicleForm(true)}
             className="w-full mt-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition-colors"
@@ -868,23 +983,21 @@ export default function ResidentPortal() {
         </div>
       </div>
 
-      {/* Invoice Detail Modal */}
       <InvoiceDetailModal
         isOpen={showPaymentDetailModal}
         onClose={() => setShowPaymentDetailModal(false)}
         invoice={currentInvoice}
       />
 
-      {/* Vehicle Registration Modal */}
       <VehicleRegistrationModal
         isOpen={showVehicleForm}
         onClose={() => setShowVehicleForm(false)}
         vehicleForm={vehicleForm}
         onFormChange={setVehicleForm}
         onSubmit={handleSubmitVehicle}
+        isSubmitting={isSubmitting}
       />
 
-      {/* Vehicle Detail Modal */}
       <VehicleDetailModal
         isOpen={showVehicleDetailModal}
         onClose={() => setShowVehicleDetailModal(false)}

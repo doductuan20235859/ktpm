@@ -8,7 +8,7 @@ import { Product } from './product.entity'; // Import file vừa tạo
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ApartmentsModule } from './apartments/apartments.module';
-import { VehicleModule } from './vehicles/vehicle.module';
+import { VehiclesModule } from './vehicles/vehicles.module';
 import { RequestsModule } from './requests/requests.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { AmenitiesModule } from './amenities/amenities.module';
@@ -43,7 +43,7 @@ import { join } from 'path';
     UsersModule,
     AuthModule,
     ApartmentsModule,
-    VehicleModule,
+    VehiclesModule,
     RequestsModule,
     InvoicesModule,
     AmenitiesModule,
