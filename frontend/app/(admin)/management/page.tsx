@@ -149,6 +149,21 @@ const mockRequests = generateMockRequests();
 export default function RequestManagementPage() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [buildingFilter, setBuildingFilter] = useState<string>("ALL");
+  const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [appliedDateRange, setAppliedDateRange] = useState({ from: "", to: "" });
+  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isCreateRequestModalOpen, setIsCreateRequestModalOpen] =
+    useState(false);
+  const [isEditRequestModalOpen, setIsEditRequestModalOpen] = useState(false);
+  const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] =
+    useState(false);
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -156,6 +171,7 @@ export default function RequestManagementPage() {
         const response = await fetch('http://localhost:3001/requests');
         if (response.ok) {
           const data = await response.json();
+          console.log('Backend requests data:', data);
           // Transform data to match frontend interface
           const transformedData = data.map((req: any) => ({
             id: req.id.toString(),
@@ -166,27 +182,38 @@ export default function RequestManagementPage() {
             category: req.category,
             priority: req.priority,
             status: req.status,
-            createdDate: new Date(req.createdAt).toLocaleString('vi-VN'),
-            createdBy: req.createdBy?.name || 'N/A',
+            // Format: dd/mm/yyyy hh:mm từ createdAt
+            createdDate: req.createdAt ? new Date(req.createdAt).toLocaleString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            }).replace(',', '') : 'N/A',
+            createdBy: req.createdBy?.name || req.createdByName || 'Ban quản lý',
             assignedTo: req.assignedTo?.name,
             description: req.description || '',
             notes: req.notes?.map((note: any) => ({
               id: note.id.toString(),
               author: note.author?.name || 'N/A',
               content: note.content,
-              date: new Date(note.createdAt).toLocaleString('vi-VN'),
+              date: new Date(note.createdAt).toLocaleString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              }).replace(',', ''),
             })) || [],
           }));
           setRequests(transformedData);
         } else {
-          console.error('Failed to fetch requests');
-          // Fallback to mock data
-          setRequests(mockRequests);
+          console.error('Failed to fetch requests:', response.status);
+          setRequests([]);
         }
       } catch (error) {
         console.error('Error fetching requests:', error);
-        // Fallback to mock data
-        setRequests(mockRequests);
+        setRequests([]);
       } finally {
         setLoading(false);
       }
@@ -194,29 +221,44 @@ export default function RequestManagementPage() {
 
     fetchRequests();
   }, []);
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [buildingFilter, setBuildingFilter] = useState<string>("ALL");
-  const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
-  const [dateRange, setDateRange] = useState({ from: "", to: "" });
-  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isCreateRequestModalOpen, setIsCreateRequestModalOpen] =
-    useState(false);
-  const [isEditRequestModalOpen, setIsEditRequestModalOpen] = useState(false);
-  const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] =
-    useState(false);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, buildingFilter, priorityFilter, categoryFilter, appliedDateRange]);
   const itemsPerPage = 10;
 
-  // Filter logic
-  const parseDate = (dateStr: string): Date => {
-    // Assume format: dd/mm/yyyy hh:mm
-    const [datePart, timePart] = dateStr.split(' ');
-    const [day, month, year] = datePart.split('/').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    return new Date(year, month - 1, day, hour, minute);
+  // Filter logic - convert ngày thành YYYY-MM-DD để so sánh
+  const extractDateOnly = (dateStr: string): string => {
+    try {
+      // Handle both formats: "d/m/yyyy hh:mm" or "dd/mm/yyyy hh:mm"
+      const datePart = dateStr.split(' ')[0];
+      if (!datePart) return '';
+      const parts = datePart.split('/');
+      if (parts.length !== 3) return '';
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Helper to format date for display: dd/mm/yyyy hh:mm
+  const formatDateForDisplay = (date: Date | string): string => {
+    try {
+      const d = typeof date === 'string' ? new Date(date) : date;
+      return d.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).replace(',', '');
+    } catch (e) {
+      return 'N/A';
+    }
   };
 
   const filteredRequests = requests.filter((req) => {
@@ -234,19 +276,17 @@ export default function RequestManagementPage() {
     const matchesCategory =
       categoryFilter === "ALL" || req.category === categoryFilter;
 
-    // Date filter
+    // Date filter - simple string comparison
     let matchesDate = true;
-    if (dateRange.from || dateRange.to) {
-      const reqDate = parseDate(req.createdDate);
-      if (dateRange.from) {
-        const fromDate = new Date(dateRange.from);
-        matchesDate = matchesDate && reqDate >= fromDate;
-      }
-      if (dateRange.to) {
-        const toDate = new Date(dateRange.to);
-        // Set to end of day
-        toDate.setHours(23, 59, 59, 999);
-        matchesDate = matchesDate && reqDate <= toDate;
+    if (appliedDateRange.from || appliedDateRange.to) {
+      const reqDateStr = extractDateOnly(req.createdDate);
+      if (reqDateStr) {
+        if (appliedDateRange.from) {
+          matchesDate = matchesDate && reqDateStr >= appliedDateRange.from;
+        }
+        if (appliedDateRange.to) {
+          matchesDate = matchesDate && reqDateStr <= appliedDateRange.to;
+        }
       }
     }
 
@@ -340,14 +380,13 @@ export default function RequestManagementPage() {
 
   const handleCreateRequest = async (formData: RequestFormData) => {
     try {
-      // Assume we have createdByUserId from auth
       const payload = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         priority: formData.priority,
         apartmentId: formData.apartmentId,
-        createdByUserId: 1, // Mock, need to get from auth
+        createdByUserId: formData.createdByUserId || 1,
       };
       const response = await fetch('http://localhost:3001/requests', {
         method: 'POST',
@@ -358,20 +397,25 @@ export default function RequestManagementPage() {
       });
       if (response.ok) {
         const newRequest = await response.json();
-        // Transform and add to state
         const transformed = {
           id: newRequest.id.toString(),
           ticketCode: newRequest.ticketCode || `REQ-${newRequest.id}`,
           title: newRequest.title,
           apartmentCode: newRequest.apartment?.code || 'N/A',
-          building: newRequest.apartment?.buildingName || 'N/A',
+          building: newRequest.apartment?.building?.name || 'N/A',
           category: newRequest.category,
           priority: newRequest.priority,
           status: newRequest.status,
-          createdDate: new Date(newRequest.createdAt).toLocaleString('vi-VN'),
-          createdBy: newRequest.createdBy?.name || formData.createdBy,
+          createdDate: formatDateForDisplay(newRequest.createdAt),
+          createdBy: newRequest.createdBy?.name || 'Ban quản lý',
+          assignedTo: newRequest.assignedTo?.name,
           description: newRequest.description,
-          notes: [],
+          notes: newRequest.notes?.map((note: any) => ({
+            id: note.id.toString(),
+            author: note.author?.name || 'N/A',
+            content: note.content,
+            date: formatDateForDisplay(note.createdAt),
+          })) || [],
         };
         setRequests([...requests, transformed]);
         toast.success("Yêu cầu đã được tạo thành công!");
@@ -539,6 +583,12 @@ export default function RequestManagementPage() {
                   }
                   className="text-sm border-none outline-none w-32"
                 />
+                <button
+                  onClick={() => setAppliedDateRange(dateRange)}
+                  className="px-3 py-1 ml-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Tìm kiếm
+                </button>
               </div>
             </div>
 
@@ -607,6 +657,7 @@ export default function RequestManagementPage() {
                     setPriorityFilter("ALL");
                     setCategoryFilter("ALL");
                     setDateRange({ from: "", to: "" });
+                    setAppliedDateRange({ from: "", to: "" });
                   }}
                   className="text-sm text-blue-600 hover:text-blue-700 whitespace-nowrap"
                 >
@@ -686,6 +737,9 @@ export default function RequestManagementPage() {
                         Trạng Thái
                       </th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Thời Gian Tạo
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
                         Hành Động
                       </th>
                     </tr>
@@ -761,6 +815,11 @@ export default function RequestManagementPage() {
                             >
                               <StatusIcon className="w-3 h-3" />
                               {statusConfig.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-600">
+                              {request.createdDate}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

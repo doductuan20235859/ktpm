@@ -24,6 +24,7 @@ export interface RequestFormData {
   priority: Priority;
   description: string;
   createdBy: string;
+  createdByUserId?: number;
 }
 
 interface Apartment {
@@ -50,6 +51,7 @@ export function CreateRequestModal({
   const [loadingApartments, setLoadingApartments] = useState(false);
   const [apartmentSearch, setApartmentSearch] = useState("");
   const [showApartmentDropdown, setShowApartmentDropdown] = useState(false);
+  const [adminUserId, setAdminUserId] = useState<number | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -62,23 +64,63 @@ export function CreateRequestModal({
 
   useEffect(() => {
     if (isOpen) {
-      const fetchApartments = async () => {
+      const fetchData = async () => {
         setLoadingApartments(true);
         try {
-          const response = await fetch('http://localhost:3001/apartments');
-          if (response.ok) {
-            const data = await response.json();
+          // Fetch apartments
+          const apartmentsResponse = await fetch('http://localhost:3001/apartments');
+          if (apartmentsResponse.ok) {
+            const data = await apartmentsResponse.json();
             setApartments(data);
           } else {
             console.error('Failed to fetch apartments');
           }
+
+          // Fetch admin user
+          try {
+            const usersResponse = await fetch('http://localhost:3001/users');
+            if (usersResponse.ok) {
+              const users = await usersResponse.json();
+              // Find admin user
+              const adminUser = users.find((user: any) => user.role === 'ADMIN');
+              if (adminUser) {
+                setAdminUserId(adminUser.id);
+                setFormData((prev) => ({
+                  ...prev,
+                  createdBy: adminUser.name || 'Ban quản lý',
+                }));
+              } else {
+                // No admin user found, set default
+                setAdminUserId(1);
+                setFormData((prev) => ({
+                  ...prev,
+                  createdBy: 'Ban quản lý',
+                }));
+              }
+            } else {
+              // Fetch failed, set default
+              setAdminUserId(1);
+              setFormData((prev) => ({
+                ...prev,
+                createdBy: 'Ban quản lý',
+              }));
+            }
+          } catch (error) {
+            console.warn('Error fetching users, using default admin:', error);
+            // Set default values if fetch fails
+            setAdminUserId(1);
+            setFormData((prev) => ({
+              ...prev,
+              createdBy: 'Ban quản lý',
+            }));
+          }
         } catch (error) {
-          console.error('Error fetching apartments:', error);
+          console.error('Error fetching data:', error);
         } finally {
           setLoadingApartments(false);
         }
       };
-      fetchApartments();
+      fetchData();
     }
   }, [isOpen]);
 
@@ -117,7 +159,10 @@ export function CreateRequestModal({
     e.preventDefault();
 
     if (validateForm()) {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        createdByUserId: adminUserId || undefined,
+      });
       toast.success("Tạo yêu cầu thành công!", {
         description: `Mã yêu cầu: REQ-2024-${String(
           Math.floor(Math.random() * 1000)
@@ -254,11 +299,8 @@ export function CreateRequestModal({
                   <input
                     type="text"
                     value={formData.createdBy}
-                    onChange={(e) =>
-                      handleInputChange("createdBy", e.target.value)
-                    }
-                    placeholder="Nhập tên người tạo"
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                    readOnly
+                    className={`w-full px-4 py-3 border rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed ${
                       errors.createdBy ? "border-red-500" : "border-gray-300"
                     }`}
                   />
