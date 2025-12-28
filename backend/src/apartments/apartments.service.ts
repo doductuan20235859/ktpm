@@ -50,11 +50,21 @@ export class ApartmentsService {
   }
 
   // ================= FIND ALL =================
-  async findAll(): Promise<Apartment[]> {
-    return this.apartmentRepository.find({
-      order: { createdAt: 'DESC' },
-    });
-  }
+  async findAll() {
+  const apartments = await this.apartmentRepository.find({
+    relations: ['owner'],
+  });
+
+  return apartments.map((apt) => ({
+    id: apt.id,
+    code: apt.code,
+    areaSqm: apt.areaSqm,
+    status: apt.status,
+    ownerName: apt.owner?.fullName ?? null,
+    ownerPhone: apt.owner?.phoneNumber ?? null,
+  }));
+}
+
 
   // ================= FIND ONE =================
   async findOne(id: number): Promise<Apartment> {

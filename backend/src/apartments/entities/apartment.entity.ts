@@ -50,11 +50,10 @@ export class Apartment {
   @Column({ name: 'owner_id', nullable: true })
   ownerId: number;
 
-  @ManyToOne(() => User, (user) => user.ownedApartments, {
-    onDelete: 'SET NULL',
-  })
-  @JoinColumn({ name: 'owner_id' })
-  owner: User;
+  @ManyToOne(() => User, { nullable: true })
+@JoinColumn({ name: 'owner_id' })
+owner: User;
+
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
