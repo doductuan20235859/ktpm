@@ -432,14 +432,17 @@ export default function RequestManagementPage() {
   const handleEditRequest = async (updatedData: RequestUpdateData) => {
     if (selectedRequest) {
       try {
-        const payload = {
+        const payload: any = {
           title: updatedData.title,
           description: updatedData.description,
           category: updatedData.category,
           priority: updatedData.priority,
           status: updatedData.status,
-          // assignedToUserId: updatedData.assignedTo ? getUserId(updatedData.assignedTo) : null,
         };
+        // Only include apartmentId if it's defined
+        if (updatedData.apartmentId !== undefined) {
+          payload.apartmentId = updatedData.apartmentId;
+        }
         const response = await fetch(`http://localhost:3001/requests/${selectedRequest.id}`, {
           method: 'PATCH',
           headers: {

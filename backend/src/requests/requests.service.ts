@@ -41,7 +41,26 @@ export class RequestsService {
   }
 
   async update(id: number, updateRequestDto: UpdateRequestDto): Promise<Request> {
-    await this.requestRepository.update(id, updateRequestDto);
+    // Lấy request hiện tại
+    const request = await this.findOne(id);
+    
+    // Cập nhật các trường được cung cấp
+    if (updateRequestDto.title !== undefined) request.title = updateRequestDto.title;
+    if (updateRequestDto.category !== undefined) request.category = updateRequestDto.category;
+    if (updateRequestDto.priority !== undefined) request.priority = updateRequestDto.priority;
+    if (updateRequestDto.status !== undefined) request.status = updateRequestDto.status;
+    if (updateRequestDto.description !== undefined) request.description = updateRequestDto.description;
+    
+    // Xử lý quan hệ
+    if (updateRequestDto.apartmentId !== undefined) {
+      request.apartment = { id: updateRequestDto.apartmentId } as any;
+    }
+    if (updateRequestDto.assignedToUserId !== undefined) {
+      request.assignedTo = updateRequestDto.assignedToUserId ? { id: updateRequestDto.assignedToUserId } as any : null;
+    }
+    
+    // Lưu vào database
+    await this.requestRepository.save(request);
     return this.findOne(id);
   }
 
