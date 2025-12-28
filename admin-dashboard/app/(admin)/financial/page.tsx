@@ -85,7 +85,9 @@ useEffect(() => {
   const [showReceiptEntry, setShowReceiptEntry] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
-
+  const [createdInvoiceData, setCreatedInvoiceData] = useState<any>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -142,7 +144,13 @@ useEffect(() => {
         icon: DollarSign,
       },
     };
-    return styles[status];
+    // Logic: Nếu tìm thấy status trong danh sách trên thì dùng, 
+  // không thì trả về một object có cấu trúc tương tự để không lỗi .bg
+  return styles[status] || { 
+    bg: "bg-gray-100 text-gray-500", 
+    label: status || "Đang tải...", // Hiển thị chính cái status đó nếu có
+    icon: Clock 
+  };
   };
 
   // Filter logic
@@ -491,14 +499,122 @@ useEffect(() => {
       )}
 
       {/* Create Invoice Modal */}
-      <CreateInvoiceModal
+      {/* <CreateInvoiceModal
         isOpen={showCreateInvoiceModal}
         onClose={() => setShowCreateInvoiceModal(false)}
         onSubmit={(invoiceData) => {
           console.log("Tạo hóa đơn:", invoiceData);
           // Add logic to save invoice here
         }}
+      /> */}
+
+      {/* Create Invoice Modal */}
+      <CreateInvoiceModal
+        isOpen={showCreateInvoiceModal}
+        onClose={() => setShowCreateInvoiceModal(false)}
+        onSubmit={(invoiceData) => {
+          console.log('Tạo hóa đơn:', invoiceData);
+          // Add logic to save invoice here
+          // Bổ sung thông tin cho hóa đơn mới
+          const completeInvoiceData = {
+            ...invoiceData,
+            // status: 'PUBLISHED' as InvoiceStatus,
+            // paidAmount: 0,
+            // items: invoiceData.items.map((item: any) => ({
+            //   ...item,
+            //   paid: false,
+            // })),
+          };
+          setCreatedInvoiceData(completeInvoiceData);
+          setShowSuccessModal(true);
+        }}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && createdInvoiceData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl text-white">Tạo Hóa Đơn Thành Công</h2>
+                <p className="text-sm text-green-100 mt-1">Hóa đơn mới đã được tạo thành công</p>
+              </div>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="text-white hover:bg-green-500 p-2 rounded-lg transition-colors"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-sm text-gray-600">Căn hộ</p>
+                  <p className="text-lg text-gray-900">{createdInvoiceData?.building?.replace(/Tòa\s+/i, '')}-{createdInvoiceData?.apartmentCode}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Kỳ thanh toán</p>
+                  <p className="text-lg text-gray-900">{createdInvoiceData?.period}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Hạn thanh toán</p>
+                  <p className="text-lg text-gray-900">{new Date(createdInvoiceData.dueDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Trạng thái</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm ${getStatusBadge(createdInvoiceData?.status).bg}`}>
+                    {getStatusBadge(createdInvoiceData?.status).label}
+                  </span>
+                </div>
+              </div>
+
+              <h3 className="text-lg text-gray-900 mb-4">Chi tiết khoản thu</h3>
+              <div className="space-y-3 mb-6">
+                {(createdInvoiceData?.items ?? []).map((item: InvoiceItem, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-gray-900">{item.feeType}</p>
+                      <p className="text-sm text-gray-600">{item.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-gray-900">{formatCurrency(item.amount)}</p>
+                      {item.paid && (
+                        <span className="text-xs text-green-600">✓ Đã thanh toán</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Tổng tiền:</span>
+                  <span className="text-gray-900">{formatCurrency(createdInvoiceData?.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Đã thanh toán:</span>
+                  <span className="text-green-600">{formatCurrency(createdInvoiceData?.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between text-lg">
+                  <span className="text-gray-900">Còn lại:</span>
+                  <span className="text-red-600">{formatCurrency(createdInvoiceData?.totalAmount - createdInvoiceData?.paidAmount)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                In Hóa Đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

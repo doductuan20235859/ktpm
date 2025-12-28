@@ -1,14 +1,20 @@
 // invoices.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Invoice } from './entities/invoice.entity';
+import { Apartment } from '../apartments/entities/apartment.entity';
+import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { InvoiceItem } from './entities/invoice-item.entity';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     @InjectRepository(Invoice)
     private invoiceRepository: Repository<Invoice>,
+    @InjectRepository(Apartment)
+    private apartmentRepository: Repository<Apartment>,
+    private dataSource: DataSource, // Dùng để quản lý Transaction
   ) {}
 
   // Hàm lấy tất cả hóa đơn
@@ -58,4 +64,56 @@ export class InvoicesService {
     // 4. Lưu lại bản ghi đã cập nhật vào Database
     return await this.invoiceRepository.save(invoice);
   }
+
+  
+  async create(createInvoiceDto: CreateInvoiceDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Tìm Apartment dựa trên building và apartmentCode gửi từ Frontend
+      const apartment = await this.apartmentRepository.findOne({
+        where: { 
+          code: `${createInvoiceDto.building.replace(/Tòa\s+/i, '')}-${createInvoiceDto.apartmentCode}`
+        },
+      });
+
+      if (!apartment) {
+        throw new NotFoundException('Không tìm thấy căn hộ tương ứng');
+      }
+
+      // 2. Chuẩn bị dữ liệu Invoice
+      // Chuyển đổi chuỗi "YYYY-MM" hoặc "YYYY-MM-DD" từ DTO sang kiểu Date cho Entity
+      const invoice = queryRunner.manager.create(Invoice, {
+        apartment: apartment,
+        periodDate: new Date(createInvoiceDto.period), //"2024-05"
+        dueDate: new Date(createInvoiceDto.dueDate),
+        notes: createInvoiceDto.notes,
+        totalAmount: createInvoiceDto.totalAmount,
+        paidAmount: createInvoiceDto.paidAmount || 0,
+        // InvoiceCode bạn có thể tự sinh hoặc để null nếu DB tự sinh
+        invoiceCode: `INV-${createInvoiceDto.period}-${createInvoiceDto.building.replace(/Tòa\s+/i, '')}${createInvoiceDto.apartmentCode}`,
+        createdAt: new Date(),
+        // Gán mảng items trực tiếp vào đây nhờ cascade: true
+        items: createInvoiceDto.items.map((item) => ({
+          ...item,
+          feeType: item.feeType as any,
+        })),
+      });
+
+      // 3. Lưu Invoice chính
+      const savedInvoice = await queryRunner.manager.save(invoice);
+
+      await queryRunner.commitTransaction();
+
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Plus, Trash2, Calendar, DollarSign } from 'lucide-react';
+import axios from 'axios';
 
 interface InvoiceItem {
   id: string;
@@ -96,18 +97,35 @@ export function CreateInvoiceModal({ isOpen, onClose, onSubmit }: CreateInvoiceM
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validate()) {
-      const invoiceData = {
-        ...formData,
-        items: items,
-        totalAmount: calculateTotal(),
-      };
-      onSubmit(invoiceData);
-      handleReset();
-      onClose();
+  const handleSubmit = async () => { // Thêm async ở đây
+  if (validate()) {
+    // Loại bỏ 'id' khỏi từng item để tránh lỗi validation
+    const cleanItems = items.map(({ id, ...rest }) => rest);
+    // 1. Chuẩn bị dữ liệu hoàn chỉnh
+    const invoiceData = {
+      ...formData,
+      items: cleanItems,
+      totalAmount: calculateTotal(),
+      status: 'PUBLISHED', // Gán trạng thái mặc định
+      paidAmount: 0,       // Hóa đơn mới tạo mặc định chưa đóng tiền
+    };
+
+    try {
+      // 2. Gửi yêu cầu POST đến Backend
+      const response = await axios.post('http://localhost:3001/invoices', invoiceData);
+
+      if (response.status === 201 || response.status === 200) {
+        // 3. Nếu thành công, thực hiện các logic cũ của bạn
+        onSubmit(response.data.data); // Truyền dữ liệu thật từ DB về (có kèm ID)
+        handleReset();
+        onClose();
+      }
+    } catch (error) {
+      console.error("Lỗi khi tạo hóa đơn:", error);
+      alert("Không thể kết nối với máy chủ để lưu hóa đơn.");
     }
-  };
+  }
+};
 
   const handleReset = () => {
     setFormData({

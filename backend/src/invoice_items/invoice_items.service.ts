@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { InvoiceItem } from './entities/invoice_item.entity';
+import { CreateInvoiceDto } from '../invoices/dto/create-invoice.dto';
+import { Invoice } from '../invoices/entities/invoice.entity';
+import { Apartment } from '../apartments/entities/apartment.entity';
 
 @Injectable()
 export class InvoiceItemsService {

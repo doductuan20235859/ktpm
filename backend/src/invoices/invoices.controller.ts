@@ -1,7 +1,8 @@
 // invoices.controller.ts
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { CreateInvoiceDto } from './dto/create-invoice.dto';
 
 @Controller('invoices') // Đường dẫn API: /invoices
 export class InvoicesController {
@@ -20,6 +21,7 @@ export class InvoicesController {
   async getByApartmentCode(@Param('code') code: string) {
     return await this.invoicesService.findByApartmentCode(code);
   }
+
 @Patch(':id/pay')
   async updatePaidAmount(
   @Param('id') id: string,
@@ -31,4 +33,18 @@ export class InvoicesController {
     updateInvoiceDto.paidAmount
   );
 }
+
+@Post()
+  async createInvoice(@Body() createInvoiceDto: CreateInvoiceDto) {
+    console.log('Dữ liệu tạo hóa đơn nhận được:', createInvoiceDto);
+    
+    // Gọi sang service để thực hiện lưu vào Database
+    const newInvoice = await this.invoicesService.create(createInvoiceDto);
+    
+    return {
+      success: true,
+      message: 'Tạo hóa đơn thành công',
+      data: createInvoiceDto,
+    };
+  }
 }
