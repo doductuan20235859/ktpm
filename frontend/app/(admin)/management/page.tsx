@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -30,7 +30,7 @@ import {
 import { DeleteConfirmModal } from "@/components/shared/DeleteConfirmModal";
 import { toast } from "sonner";
 
-type RequestStatus = "NEW" | "IN_PROGRESS" | "RESOLVED";
+type RequestStatus = "NEW" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 type Priority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 type Category =
   | "ELECTRIC"
@@ -147,7 +147,53 @@ const generateMockRequests = (): Request[] => {
 const mockRequests = generateMockRequests();
 
 export default function RequestManagementPage() {
-  const [requests, setRequests] = useState<Request[]>(mockRequests);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/requests');
+        if (response.ok) {
+          const data = await response.json();
+          // Transform data to match frontend interface
+          const transformedData = data.map((req: any) => ({
+            id: req.id.toString(),
+            ticketCode: req.ticketCode || `REQ-${req.id}`,
+            title: req.title,
+            apartmentCode: req.apartment?.code || 'N/A',
+            building: req.apartment?.building?.name || 'N/A',
+            category: req.category,
+            priority: req.priority,
+            status: req.status,
+            createdDate: new Date(req.createdAt).toLocaleString('vi-VN'),
+            createdBy: req.createdBy?.name || 'N/A',
+            assignedTo: req.assignedTo?.name,
+            description: req.description || '',
+            notes: req.notes?.map((note: any) => ({
+              id: note.id.toString(),
+              author: note.author?.name || 'N/A',
+              content: note.content,
+              date: new Date(note.createdAt).toLocaleString('vi-VN'),
+            })) || [],
+          }));
+          setRequests(transformedData);
+        } else {
+          console.error('Failed to fetch requests');
+          // Fallback to mock data
+          setRequests(mockRequests);
+        }
+      } catch (error) {
+        console.error('Error fetching requests:', error);
+        // Fallback to mock data
+        setRequests(mockRequests);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRequests();
+  }, []);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -165,6 +211,14 @@ export default function RequestManagementPage() {
   const itemsPerPage = 10;
 
   // Filter logic
+  const parseDate = (dateStr: string): Date => {
+    // Assume format: dd/mm/yyyy hh:mm
+    const [datePart, timePart] = dateStr.split(' ');
+    const [day, month, year] = datePart.split('/').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    return new Date(year, month - 1, day, hour, minute);
+  };
+
   const filteredRequests = requests.filter((req) => {
     const matchesSearch =
       req.ticketCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -180,12 +234,29 @@ export default function RequestManagementPage() {
     const matchesCategory =
       categoryFilter === "ALL" || req.category === categoryFilter;
 
+    // Date filter
+    let matchesDate = true;
+    if (dateRange.from || dateRange.to) {
+      const reqDate = parseDate(req.createdDate);
+      if (dateRange.from) {
+        const fromDate = new Date(dateRange.from);
+        matchesDate = matchesDate && reqDate >= fromDate;
+      }
+      if (dateRange.to) {
+        const toDate = new Date(dateRange.to);
+        // Set to end of day
+        toDate.setHours(23, 59, 59, 999);
+        matchesDate = matchesDate && reqDate <= toDate;
+      }
+    }
+
     return (
       matchesSearch &&
       matchesStatus &&
       matchesBuilding &&
       matchesPriority &&
-      matchesCategory
+      matchesCategory &&
+      matchesDate
     );
   });
 
@@ -205,6 +276,12 @@ export default function RequestManagementPage() {
         label: "Mới",
         icon: AlertCircle,
       },
+      ASSIGNED: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-700",
+        label: "Đã giao",
+        icon: UserCircle,
+      },
       IN_PROGRESS: {
         bg: "bg-orange-100",
         text: "text-orange-700",
@@ -215,6 +292,12 @@ export default function RequestManagementPage() {
         bg: "bg-green-100",
         text: "text-green-700",
         label: "Đã giải quyết",
+        icon: CheckCircle,
+      },
+      CLOSED: {
+        bg: "bg-gray-100",
+        text: "text-gray-700",
+        label: "Đã đóng",
         icon: CheckCircle,
       },
     };
@@ -255,54 +338,118 @@ export default function RequestManagementPage() {
     );
   };
 
-  const handleCreateRequest = (formData: RequestFormData) => {
-    const newRequest: Request = {
-      id: `${requests.length + 1}`,
-      ticketCode: `REQ-2024-${String(requests.length + 1).padStart(3, "0")}`,
-      title: formData.title,
-      apartmentCode: formData.apartmentCode,
-      building: formData.building,
-      category: formData.category,
-      priority: formData.priority,
-      status: "NEW",
-      createdDate: new Date().toLocaleString(),
-      createdBy: formData.createdBy,
-      description: formData.description,
-      notes: [],
-    };
-    setRequests([...requests, newRequest]);
-    toast.success("Yêu cầu đã được tạo thành công!");
-    setIsCreateRequestModalOpen(false);
-  };
-
-  const handleEditRequest = (updatedData: RequestUpdateData) => {
-    if (selectedRequest) {
-      setRequests((prev) =>
-        prev.map((req) =>
-          req.id === selectedRequest.id
-            ? {
-                ...req,
-                title: updatedData.title,
-                apartmentCode: updatedData.apartmentCode,
-                building: updatedData.building,
-                category: updatedData.category,
-                priority: updatedData.priority,
-                status: updatedData.status,
-                description: updatedData.description,
-                assignedTo: updatedData.assignedTo,
-              }
-            : req
-        )
-      );
-      toast.success("Yêu cầu đã được cập nhật thành công!");
-      setIsEditRequestModalOpen(false);
+  const handleCreateRequest = async (formData: RequestFormData) => {
+    try {
+      // Assume we have createdByUserId from auth
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        priority: formData.priority,
+        apartmentId: formData.apartmentId,
+        createdByUserId: 1, // Mock, need to get from auth
+      };
+      const response = await fetch('http://localhost:3001/requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        const newRequest = await response.json();
+        // Transform and add to state
+        const transformed = {
+          id: newRequest.id.toString(),
+          ticketCode: newRequest.ticketCode || `REQ-${newRequest.id}`,
+          title: newRequest.title,
+          apartmentCode: newRequest.apartment?.code || 'N/A',
+          building: newRequest.apartment?.buildingName || 'N/A',
+          category: newRequest.category,
+          priority: newRequest.priority,
+          status: newRequest.status,
+          createdDate: new Date(newRequest.createdAt).toLocaleString('vi-VN'),
+          createdBy: newRequest.createdBy?.name || formData.createdBy,
+          description: newRequest.description,
+          notes: [],
+        };
+        setRequests([...requests, transformed]);
+        toast.success("Yêu cầu đã được tạo thành công!");
+        setIsCreateRequestModalOpen(false);
+      } else {
+        toast.error("Lỗi khi tạo yêu cầu!");
+      }
+    } catch (error) {
+      console.error('Error creating request:', error);
+      toast.error("Lỗi khi tạo yêu cầu!");
     }
   };
 
-  const handleDeleteRequest = (requestId: string) => {
-    setRequests((prev) => prev.filter((req) => req.id !== requestId));
-    toast.success("Yêu cầu đã được xóa thành công!");
-    setIsDeleteConfirmModalOpen(false);
+  const handleEditRequest = async (updatedData: RequestUpdateData) => {
+    if (selectedRequest) {
+      try {
+        const payload = {
+          title: updatedData.title,
+          description: updatedData.description,
+          category: updatedData.category,
+          priority: updatedData.priority,
+          status: updatedData.status,
+          // assignedToUserId: updatedData.assignedTo ? getUserId(updatedData.assignedTo) : null,
+        };
+        const response = await fetch(`http://localhost:3001/requests/${selectedRequest.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        if (response.ok) {
+          const updatedRequest = await response.json();
+          // Transform and update state
+          const transformed = {
+            ...selectedRequest,
+            title: updatedRequest.title,
+            category: updatedRequest.category,
+            priority: updatedRequest.priority,
+            status: updatedRequest.status,
+            description: updatedRequest.description,
+            apartmentCode: updatedRequest.apartment?.code || selectedRequest.apartmentCode,
+            building: updatedRequest.apartment?.buildingName || selectedRequest.building,
+            createdBy: updatedRequest.createdBy?.name || selectedRequest.createdBy,
+          };
+          setRequests((prev) =>
+            prev.map((req) =>
+              req.id === selectedRequest.id ? transformed : req
+            )
+          );
+          toast.success("Yêu cầu đã được cập nhật thành công!");
+          setIsEditRequestModalOpen(false);
+        } else {
+          toast.error("Lỗi khi cập nhật yêu cầu!");
+        }
+      } catch (error) {
+        console.error('Error updating request:', error);
+        toast.error("Lỗi khi cập nhật yêu cầu!");
+      }
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/requests/${requestId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setRequests((prev) => prev.filter((req) => req.id !== requestId));
+        toast.success("Yêu cầu đã được xóa thành công!");
+        setIsDeleteConfirmModalOpen(false);
+      } else {
+        toast.error("Lỗi khi xóa yêu cầu!");
+      }
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast.error("Lỗi khi xóa yêu cầu!");
+    }
   };
 
   return (
@@ -557,7 +704,7 @@ export default function RequestManagementPage() {
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
-                              <div className="text-blue-600 cursor-pointer hover:underline">
+                              <div className="text-blue-600 cursor-pointer hover:underline" onClick={() => setSelectedRequest(request)}>
                                 {request.ticketCode}
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
@@ -637,8 +784,9 @@ export default function RequestManagementPage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  setSelectedRequest(request);
-                                  setIsDeleteConfirmModalOpen(true);
+                                  if (confirm('Bạn có chắc muốn xóa yêu cầu này?')) {
+                                    handleDeleteRequest(request.id);
+                                  }
                                 }}
                                 className="p-1 hover:bg-gray-100 rounded transition-colors"
                                 title="Xóa"
@@ -732,10 +880,10 @@ export default function RequestManagementPage() {
         {selectedRequest && (
           <RequestDetailModal
             request={selectedRequest}
+            isOpen={!!selectedRequest}
             onClose={() => setSelectedRequest(null)}
-            onUpdate={(updatedRequest) => {
-              setSelectedRequest(null);
-            }}
+            onEdit={() => setIsEditRequestModalOpen(true)}
+            onDelete={() => setIsDeleteConfirmModalOpen(true)}
           />
         )}
 
