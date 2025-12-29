@@ -24,6 +24,7 @@ interface Apartment {
   status: 'OCCUPIED_OWNER' | 'OCCUPIED_TENANT' | 'AVAILABLE' | 'VACANT' | 'MAINTENANCE';
   members: Member[];
   history: ResidencyHistory[];
+
 }
 
 interface ApartmentDetailModalProps {
@@ -97,10 +98,7 @@ export function ApartmentDetailModal({ apartment, onClose }: ApartmentDetailModa
                 <p className="text-sm text-gray-600">Số Điện Thoại</p>
                 <p className="text-lg text-gray-900">{apartment.phone}</p>
               </div>
-            </div>
-          </div>
-
-          {/* Members Section */}
+              {/* Members Section */}
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg text-gray-900 mb-4 flex items-center gap-2">
               <UsersIcon className="w-5 h-5 text-blue-600" />
@@ -134,6 +132,11 @@ export function ApartmentDetailModal({ apartment, onClose }: ApartmentDetailModa
               ))}
             </div>
           </div>
+            </div>
+          </div>
+
+          {/* Members Section */}
+          
 
           {/* History Section */}
           <div className="p-6">

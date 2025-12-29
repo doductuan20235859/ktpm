@@ -28,12 +28,47 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
     status: 'Vacant',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const payload = {
+  buildingName: formData.block, // ✅ BẮT BUỘC
+  unitNumber: formData.unitNumber,
+  floorNumber: formData.floorLevel,
+  areaSqm: formData.area,
+  status:
+    formData.status === 'Vacant'
+      ? 'VACANT'
+      : formData.status === 'Maintenance'
+      ? 'MAINTENANCE'
+      : 'OCCUPIED',
+};
+
+
+    const res = await fetch('http://localhost:3001/apartments/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error('Create apartment failed');
+    }
+
+    // ✅ gọi callback để page reload data
     onSave(formData);
+
     handleReset();
     onClose();
-  };
+  } catch (error) {
+    console.error('Create apartment error:', error);
+    alert('Tạo căn hộ thất bại');
+  }
+};
+
 
   const handleReset = () => {
     setFormData({

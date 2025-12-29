@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { Apartment } from './entities/apartment.entity';
 import { CreateApartmentDto } from './dto/create-apartment.dto';
 import { UpdateApartmentDto } from './dto/update-apartment.dto';
+import { ResidentRole } from '../common/enums/database.enums';
 
 @Injectable()
 export class ApartmentsService {
@@ -50,20 +51,48 @@ export class ApartmentsService {
   }
 
   // ================= FIND ALL =================
-  async findAll() {
-  const apartments = await this.apartmentRepository.find({
-    relations: ['owner'],
-  });
+async findAll() {
+    // 1. Lấy dữ liệu kèm theo quan hệ owner và residents
+    const apartments = await this.apartmentRepository.find({
+      relations: ['owner', 'residents'],
+    });
 
-  return apartments.map((apt) => ({
-    id: apt.id,
-    code: apt.code,
-    areaSqm: apt.areaSqm,
-    status: apt.status,
-    ownerName: apt.owner?.fullName ?? null,
-    ownerPhone: apt.owner?.phoneNumber ?? null,
-  }));
-}
+    // 2. Map dữ liệu để tính toán số thành viên (residentCount)
+    return apartments.map((apt) => {
+      const residents = apt.residents || [];
+      
+      // Kiểm tra xem có người thuê (TENANT) đang hoạt động hay không
+      const activeResidents = residents.filter(r => r.isActive);
+      const hasActiveTenant = activeResidents.some(
+        (r) => r.role === ResidentRole.TENANT,
+      );
+
+      let residentCount = 0;
+
+      if (hasActiveTenant) {
+        // Nếu có người thuê: Chỉ đếm những người là TENANT
+        residentCount = activeResidents.filter(
+          (r) => r.role === ResidentRole.TENANT,
+        ).length;
+      } else {
+        // Nếu không có người thuê: Đếm cả OWNER và MEMBER
+        residentCount = activeResidents.filter(
+          (r) => r.role === ResidentRole.OWNER || r.role === ResidentRole.MEMBER,
+        ).length;
+      }
+
+      // 3. Trả về cấu trúc dữ liệu mong muốn cho Frontend
+      return {
+        id: apt.id,
+        code: apt.code,
+        areaSqm: apt.areaSqm,
+        status: apt.status,
+        ownerName: apt.owner ? apt.owner.fullName : null,
+        ownerPhone: apt.owner ? apt.owner.phoneNumber : null,
+        residentCount: residentCount, // Số thành viên trong căn hộ
+      };
+    });
+  }
 
 
   // ================= FIND ONE =================
