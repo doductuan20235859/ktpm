@@ -178,7 +178,7 @@ useEffect(() => {
   };
 
   if (showReceiptEntry) {
-    return <ReceiptEntry onBack={() => setShowReceiptEntry(false)} />;
+    return <ReceiptEntry onBack={() => {setShowReceiptEntry(false), fetchInvoicesFromDB()}} />;
   }
 
   return (

@@ -42,6 +42,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onSubmit }: CreateInvoiceM
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const formatCurrency = (value: number) => {
@@ -120,9 +122,17 @@ export function CreateInvoiceModal({ isOpen, onClose, onSubmit }: CreateInvoiceM
         handleReset();
         onClose();
       }
-    } catch (error) {
+    } catch (error:any) {
       console.error("Lỗi khi tạo hóa đơn:", error);
+      if (error.response && error.response.status === 404) {
+      const message = error.response.data.message;
+      setErrorMessage(message); // Lưu tin nhắn "Không tìm thấy căn hộ..."
+      if(errorMessage)
+      alert(errorMessage);
+    }
+    else{
       alert("Không thể kết nối với máy chủ để lưu hóa đơn.");
+    }
     }
   }
 };
@@ -390,3 +400,4 @@ export function CreateInvoiceModal({ isOpen, onClose, onSubmit }: CreateInvoiceM
     </div>
   );
 }
+

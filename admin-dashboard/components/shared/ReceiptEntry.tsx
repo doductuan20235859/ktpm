@@ -63,6 +63,9 @@ export function ReceiptEntry({ onBack }: ReceiptEntryProps) {
     setHasError(false);
     setSearchedApartmentCode(apartmentCode); // Lưu mã căn hộ đã tìm kiếm
     setInvoices([]);
+    setAmountReceived('');
+    setNote('');
+    setPaymentMethod('CASH');
 
   try {
     const response = await axios.get(`http://localhost:3001/invoices/apartment/${apartmentCode}`);

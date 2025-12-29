@@ -80,7 +80,7 @@ export class InvoicesService {
       });
 
       if (!apartment) {
-        throw new NotFoundException('Không tìm thấy căn hộ tương ứng');
+        throw new NotFoundException(`Không tìm thấy căn hộ ${createInvoiceDto.apartmentCode} thuộc ${createInvoiceDto.building}`);
       }
 
       // 2. Chuẩn bị dữ liệu Invoice
