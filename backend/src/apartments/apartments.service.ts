@@ -96,35 +96,53 @@ async findAll() {
 
 
   // ================= FIND ONE =================
-  async findOne(id: number): Promise<Apartment> {
-    const apartment = await this.apartmentRepository.findOne({
-      where: { id },
+ async findOne(id: number) {
+  const apartment = await this.apartmentRepository.findOne({
+    where: { id },
+    relations: ['owner', 'residents', 'residents.user'], // Đã bao gồm quan hệ owner
+  });
+
+  if (!apartment) throw new NotFoundException('Không tìm thấy căn hộ');
+
+  return {
+    ...apartment,
+    // Lấy thông tin từ object owner (liên kết với entity User)
+    ownerName: apartment.owner ? apartment.owner.fullName : 'Chưa có chủ hộ',
+    ownerPhone: apartment.owner ? apartment.owner.phoneNumber : 'N/A',
+    
+    // Trả về danh sách thành viên được format sẵn
+    members: apartment.residents?.map(res => ({
+      id: res.id,
+      name: res.user?.fullName || 'N/A',
+      role: res.role,
+      phone: res.user?.phoneNumber || 'N/A',
+      joinDate: new Date(res.joinDate).toLocaleDateString('vi-VN'),
+      isActive: res.isActive
+    })) || []
+  };
+}
+  // ================= UPDATE =================
+  async update(id: number, updateApartmentDto: UpdateApartmentDto) {
+    // 1. Kiểm tra tồn tại
+    const apartment = await this.apartmentRepository.findOne({ 
+      where: { id } 
     });
 
     if (!apartment) {
-      throw new NotFoundException(`Apartment with id ${id} not found`);
+      throw new NotFoundException(`Căn hộ với ID ${id} không tồn tại`);
     }
 
-    return apartment;
+    // 2. Cập nhật dữ liệu vào entity
+    // Object.assign sẽ đè các field có trong DTO lên entity hiện tại
+    Object.assign(apartment, updateApartmentDto);
+
+    // 3. Lưu vào DB
+    await this.apartmentRepository.save(apartment);
+
+    // 4. Trả về dữ liệu chi tiết (tận dụng hàm findOne đã viết ở bước trước)
+    // Việc này giúp lấy lại đầy đủ quan hệ 'owner' và 'residents' mới nhất
+    return this.findOne(id);
   }
-
-  // ================= UPDATE =================
-  async update(
-    id: number,
-    dto: UpdateApartmentDto,
-  ): Promise<Apartment> {
-    const apartment = await this.findOne(id);
-
-    Object.assign(apartment, dto);
-
-    // Nếu update buildingName hoặc unitNumber → update lại code
-    if (dto.buildingName || dto.unitNumber) {
-      apartment.code = `${apartment.buildingName}-${apartment.unitNumber}`;
-    }
-
-    return this.apartmentRepository.save(apartment);
-  }
-
   // ================= DELETE =================
   async remove(id: number): Promise<{ deleted: true }> {
     const result = await this.apartmentRepository.delete(id);

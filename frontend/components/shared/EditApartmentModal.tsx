@@ -51,7 +51,7 @@
     const [coverPreview, setCoverPreview] = useState<string>("");
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
-
+    const [isSubmitting, setIsSubmitting] = useState(false); // Trạng thái loading
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     if (!isOpen) return null;
@@ -125,12 +125,41 @@
       return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = () => {
-      if (validateForm()) {
-        onUpdate(formData);
-      }
-    };
+    const handleSubmit = async () => {
+    if (!validateForm()) return;
 
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`http://localhost:3001/apartments/${apartment.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: formData.code,
+          areaSqm: formData.area, // Lưu ý: Backend dùng areaSqm
+          status: formData.status,
+          // Nếu bạn muốn cập nhật thông tin chủ hộ, backend cần xử lý ownerId
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Lỗi cập nhật");
+      }
+
+      const updatedData = await response.json();
+      
+      toast.success("Cập nhật căn hộ thành công!");
+      onUpdate(updatedData); // Gọi callback để cập nhật lại danh sách ở trang cha
+      onClose(); // Đóng modal
+    } catch (error: any) {
+      toast.error(error.message || "Không thể kết nối đến máy chủ");
+      console.error("Update error:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
     const statusOptions = [
       { value: "OCCUPIED_OWNER", label: "Chủ hộ đang ở" },
       { value: "OCCUPIED_TENANT", label: "Đang cho thuê" },
@@ -156,7 +185,7 @@
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-5">
-              {/* Cover Image Upload */}
+              {/* Cover Image Upload
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
                   Ảnh Bìa
@@ -193,10 +222,10 @@
                   onChange={handleCoverChange}
                   className="hidden"
                 />
-              </div>
+              </div> */}
 
               {/* Avatar Upload */}
-              <div>
+              {/* <div>
                 <label className="block text-sm text-gray-700 mb-2">
                   Ảnh Đại Diện
                 </label>
@@ -221,16 +250,16 @@
                         <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     )}
-                  </div>
-                  <div className="flex-1">
+                  </div> */}
+                  {/* <div className="flex-1">
                     <p className="text-sm text-gray-600 mb-1">
                       Tải lên ảnh đại diện cho căn hộ
                     </p>
                     <p className="text-xs text-gray-400">
                       Định dạng: JPG, PNG. Kích thước tối đa: 5MB
                     </p>
-                  </div>
-                </div>
+                  </div> */}
+                {/* </div>
                 <input
                   ref={avatarInputRef}
                   type="file"
@@ -238,7 +267,7 @@
                   onChange={handleAvatarChange}
                   className="hidden"
                 />
-              </div>
+              </div> */}
 
               {/* Form Fields */}
               <div className="grid grid-cols-2 gap-4">
@@ -341,19 +370,28 @@
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Hủy
-            </button>
-            <button
-              onClick={handleSubmit}
-              className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Cập Nhật
-            </button>
-          </div>
+      <button
+        onClick={onClose}
+        disabled={isSubmitting}
+        className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+      >
+        Hủy
+      </button>
+      <button
+        onClick={handleSubmit}
+        disabled={isSubmitting}
+        className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
+      >
+        {isSubmitting ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            Đang lưu...
+          </>
+        ) : (
+          "Cập Nhật"
+        )}
+      </button>
+    </div>
         </div>
       </div>
     );

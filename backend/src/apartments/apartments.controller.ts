@@ -23,8 +23,12 @@ create(@Body() createApartmentDto: CreateApartmentDto) {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateApartmentDto: UpdateApartmentDto) {
-    return this.apartmentsService.update(+id, updateApartmentDto);
+  async update(
+    @Param('id') id: string, 
+    @Body() updateApartmentDto: UpdateApartmentDto
+  ) {
+    // Chúng ta trả về kết quả từ service đã được format lại thông tin owner/residents
+    return await this.apartmentsService.update(+id, updateApartmentDto);
   }
 
   @Delete(':id')
