@@ -26,8 +26,8 @@ export class Notification {
   targetAudience: string;
 
   // Mảng ID của user/building (Postgres Array)
-  @Column('int', { array: true, name: 'target_ids', nullable: true })
-  targetIds: number[];
+  @Column('text', { array: true, name: 'target_ids', nullable: true })
+  targetIds: string[];
 
   @ManyToOne(() => User, (user) => user.createdNotifications, {
     nullable: true,

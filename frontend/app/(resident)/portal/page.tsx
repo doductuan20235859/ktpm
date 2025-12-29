@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Bell,
   DollarSign,
@@ -12,9 +12,6 @@ import {
   AlertCircle,
   X,
   UserCircle,
-  User,
-  Download,
-  Printer,
   Trash2,
   Loader2,
 } from "lucide-react";
@@ -24,7 +21,8 @@ import { VehicleDetailModal } from "@/components/shared/VehicleDetailModal";
 import { toast } from "sonner";
 
 // --- INTERFACES ---
-interface Notification {
+interface NotificationItem {
+  // Đổi tên để tránh trùng lặp
   id: string;
   title: string;
   content: string;
@@ -100,14 +98,19 @@ export default function ResidentPortal() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPaymentDetailModal, setShowPaymentDetailModal] = useState(false);
   const [showVehicleDetailModal, setShowVehicleDetailModal] = useState(false);
-
+  // --- STATE DATA & LOADING CHO HÓA ĐƠN ---
+  const [invoices, setInvoices] = useState<Invoice[]>([]); // Danh sách hóa đơn
+  const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null); // Hóa đơn đang xem chi tiết
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   // --- STATE DATA & LOADING ---
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
   const [myRequests, setMyRequests] = useState<RequestItem[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]); // SỬA: Thêm state notifications
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
 
@@ -127,7 +130,48 @@ export default function ResidentPortal() {
     apartmentNumber: "",
     role: "Cư dân",
   });
+  const fetchMyInvoices = async () => {
+    try {
+      setIsLoadingInvoices(true);
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch("http://localhost:3001/invoices/my-invoices", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
+      if (res.ok) {
+        const data = await res.json();
+
+        // Map dữ liệu từ Backend sang Frontend Interface
+        const mappedData: Invoice[] = data.map((inv: any) => ({
+          id: inv.invoiceCode, // Mã hóa đơn
+          period: new Date(inv.periodDate).toLocaleDateString("vi-VN", {
+            month: "2-digit",
+            year: "numeric",
+          }), // 12/2024
+          apartmentNumber: inv.apartment?.code || "N/A",
+          ownerName: profileData.name, // Tạm lấy tên user hiện tại
+          issueDate: new Date(inv.createdAt).toLocaleDateString("vi-VN"),
+          dueDate: new Date(inv.dueDate).toLocaleDateString("vi-VN"),
+          totalAmount: Number(inv.totalAmount),
+          status: inv.status.toLowerCase(), // PAID -> paid, UNPAID -> unpaid
+          details: inv.items.map((item: any) => ({
+            name: item.description || item.feeType, // Nếu không có mô tả thì lấy loại phí
+            amount: Number(item.amount),
+            // Các trường unit, quantity backend chưa có thì tạm để trống hoặc handle sau
+            unit: "",
+            quantity: 1,
+            unitPrice: Number(item.amount),
+          })),
+        }));
+
+        setInvoices(mappedData);
+      }
+    } catch (error) {
+      console.error("Lỗi tải hóa đơn:", error);
+    } finally {
+      setIsLoadingInvoices(false);
+    }
+  };
   const [vehicleForm, setVehicleForm] = useState({
     ownerName: "",
     apartmentNumber: "",
@@ -178,7 +222,41 @@ export default function ResidentPortal() {
 
   // --- API CALLS ---
 
-  // 1. Lấy danh sách yêu cầu
+  // 1. SỬA: Chuyển fetchMyNotifications lên đây và sửa logic
+  const fetchMyNotifications = async () => {
+    try {
+      setIsLoadingNotifications(true);
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch(
+        "http://localhost:3001/notifications/my-notifications",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const mappedData = data.map((item: any) => ({
+          id: item.id.toString(),
+          title: item.title,
+          content: item.message,
+          date: new Date(item.createdAt).toLocaleDateString("vi-VN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }),
+          type: item.type?.toLowerCase() || "info",
+        }));
+        setNotifications(mappedData); // SỬA: Set state thay vì gọi đệ quy
+      }
+    } catch (error) {
+      console.error("Lỗi tải thông báo:", error);
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  // 2. Lấy danh sách yêu cầu
   const fetchMyRequests = async () => {
     try {
       setIsLoadingRequests(true);
@@ -212,7 +290,7 @@ export default function ResidentPortal() {
     }
   };
 
-  // 2. Lấy danh sách xe
+  // 3. Lấy danh sách xe
   const fetchMyVehicles = async () => {
     try {
       setIsLoadingVehicles(true);
@@ -242,7 +320,7 @@ export default function ResidentPortal() {
     }
   };
 
-  // 3. Gửi yêu cầu mới
+  // 4. Gửi yêu cầu mới
   const handleSubmitRequest = async () => {
     if (!requestForm.title.trim() || !requestForm.description.trim()) {
       toast.error("Vui lòng điền đầy đủ tiêu đề và mô tả");
@@ -287,7 +365,7 @@ export default function ResidentPortal() {
     }
   };
 
-  // 4. Gửi đăng ký xe mới
+  // 5. Gửi đăng ký xe mới
   const handleSubmitVehicle = async () => {
     // Validation
     if (!vehicleForm.plate.trim()) {
@@ -380,7 +458,7 @@ export default function ResidentPortal() {
     }
   };
 
-  // 5. ✅ XEM CHI TIẾT XE - Gọi API để lấy full data
+  // 6. XEM CHI TIẾT XE
   const handleViewVehicle = async (vehicle: Vehicle) => {
     try {
       const token = localStorage.getItem("accessToken");
@@ -405,7 +483,7 @@ export default function ResidentPortal() {
     }
   };
 
-  // 6. ✅ XÓA XE - GỌI API DELETE
+  // 7. XÓA XE
   const handleDeleteVehicle = async (id: string) => {
     if (!window.confirm("Bạn chắc chắn muốn xóa phương tiện này?")) {
       return;
@@ -419,8 +497,6 @@ export default function ResidentPortal() {
         return;
       }
 
-      console.log("[DELETE] Sending request for vehicle ID:", id);
-
       const res = await fetch(`http://localhost:3001/vehicles/${id}`, {
         method: "DELETE",
         headers: {
@@ -429,18 +505,12 @@ export default function ResidentPortal() {
         },
       });
 
-      console.log("[DELETE] Response status:", res.status);
-
       if (res.ok) {
         const data = await res.json();
-        console.log("[DELETE] Success:", data);
         toast.success(data.message || "Xóa xe thành công");
-
-        // Refresh danh sách sau khi xóa thành công
         await fetchMyVehicles();
       } else {
         const errorData = await res.json();
-        console.error("[DELETE] Error response:", errorData);
         toast.error(errorData.message || "Xóa xe thất bại");
       }
     } catch (error) {
@@ -451,21 +521,13 @@ export default function ResidentPortal() {
 
   // --- USE EFFECT ---
   useEffect(() => {
+    fetchMyNotifications();
     fetchMyRequests();
     fetchMyVehicles();
-  }, []);
+    fetchMyInvoices(); // <--- Gọi hàm này
+  }, []); // SỬA: Không truyền biến vào đây để tránh re-render loop
 
   // --- MOCK DATA & HELPERS ---
-  const notifications: Notification[] = [
-    {
-      id: "1",
-      title: "Thông báo thu phí tháng 12/2024",
-      content: "Kính gửi quý cư dân, Ban quản lý thông báo phí quản lý...",
-      date: "10/12/2024",
-      type: "info",
-    },
-  ];
-
   const payments: Payment[] = [
     {
       id: "1",
@@ -476,27 +538,20 @@ export default function ResidentPortal() {
     },
   ];
 
-  const totalDebt = payments
-    .filter((p) => p.status === "unpaid" || p.status === "partial")
-    .reduce((sum, p) => sum + p.amount, 0);
-
+  const totalDebt = invoices
+    .filter((inv) => inv.status === "unpaid" || inv.status === "partial")
+    .reduce((sum, inv) => sum + inv.totalAmount, 0);
+  const earliestDueDate =
+    invoices
+      .filter((i) => i.status === "unpaid")
+      .sort(
+        (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      )[0]?.dueDate || "Không có";
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
     }).format(value);
-  };
-
-  const currentInvoice: Invoice = {
-    id: "INV-2024-12-A101",
-    period: "12/2024",
-    apartmentNumber: profileData.apartmentNumber,
-    ownerName: profileData.name,
-    issueDate: "01/12/2024",
-    dueDate: "20/12/2024",
-    totalAmount: 3250000,
-    status: "unpaid",
-    details: [{ name: "Phí quản lý", amount: 1500000 }],
   };
 
   const getNotificationIcon = (type: string) => {
@@ -553,7 +608,7 @@ export default function ResidentPortal() {
             Căn hộ {profileData.apartmentNumber} | {profileData.role}
           </p>
         </div>
-        <button
+        {/* <button
           onClick={() => setShowProfileModal(true)}
           className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors border border-gray-200"
         >
@@ -564,7 +619,7 @@ export default function ResidentPortal() {
             <p className="text-sm text-gray-900">{profileData.name}</p>
             <p className="text-xs text-gray-500">Xem thông tin</p>
           </div>
-        </button>
+        </button> */}
       </div>
 
       {/* Profile Modal */}
@@ -606,11 +661,13 @@ export default function ResidentPortal() {
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-sm p-6 text-white">
           <Bell className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-sm opacity-90">Thông Báo Mới</p>
+          {/* SỬA: Dùng state notifications.length thay vì Notification.length */}
           <p className="text-3xl mt-1">{notifications.length}</p>
         </div>
         <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow-sm p-6 text-white">
           <DollarSign className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-sm opacity-90">Tổng Nợ</p>
+          {/* Sử dụng biến totalDebt đã tính ở trên */}
           <p className="text-2xl mt-1">{formatCurrency(totalDebt)}</p>
         </div>
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-sm p-6 text-white">
@@ -652,92 +709,121 @@ export default function ResidentPortal() {
               showAllNotifications ? "max-h-[500px] overflow-y-auto pr-2" : ""
             }`}
           >
-            {notifications
-              .slice(0, showAllNotifications ? undefined : 3)
-              .map((notification) => (
-                <div
-                  key={notification.id}
-                  className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">
-                      {getNotificationIcon(notification.type)}
-                    </span>
-                    <div className="flex-1">
-                      <h3 className="text-gray-900 mb-1">
-                        {notification.title}
-                      </h3>
-                      <p className="text-sm text-gray-700 mb-2">
-                        {notification.content}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {notification.date}
-                      </p>
+            {isLoadingNotifications ? (
+              <div className="flex justify-center py-6 text-gray-500">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" /> Đang tải...
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center py-8">
+                <Bell className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500">Chưa có thông báo nào</p>
+              </div>
+            ) : (
+              notifications
+                // --- SỬA TẠI ĐÂY ---
+                // Thay vì undefined, hãy dùng notifications.length để lấy toàn bộ
+                .slice(0, showAllNotifications ? notifications.length : 3)
+                .map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">
+                        {getNotificationIcon(notification.type)}
+                      </span>
+                      <div className="flex-1">
+                        <h3 className="text-gray-900 mb-1">
+                          {notification.title}
+                        </h3>
+                        <p className="text-sm text-gray-700 mb-2">
+                          {notification.content}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {notification.date}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+            )}
           </div>
         </div>
 
         {/* Payment Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl text-gray-900 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-green-600" />
-              Tra Cứu Phí
-            </h2>
-            <button
-              onClick={() => setShowPaymentHistory(!showPaymentHistory)}
-              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              <Eye className="w-4 h-4" />
-              {showPaymentHistory ? "Thu gọn" : "Lịch sử"}
-            </button>
-          </div>
+          {/* ... Header Card ... */}
 
+          {/* Hiển thị Tổng nợ từ dữ liệu thật */}
           <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-4 mb-4 border border-red-200">
             <p className="text-sm text-gray-600 mb-1">Tổng Tiền Nợ Hiện Tại</p>
-            <p className="text-3xl text-red-600">{formatCurrency(totalDebt)}</p>
+            <p className="text-3xl text-red-600">
+              {/* Sử dụng biến totalDebt cho gọn code */}
+              {formatCurrency(totalDebt)}
+            </p>
             <p className="text-xs text-gray-500 mt-2">
               Hạn thanh toán:{" "}
-              {payments.find((p) => p.status === "unpaid")?.dueDate}
+              <span className="font-medium">{earliestDueDate}</span>
             </p>
           </div>
 
           {showPaymentHistory && (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
               <h3 className="text-sm text-gray-700 mb-2">Lịch sử thanh toán</h3>
-              {payments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="text-gray-900">Tháng {payment.period}</p>
-                    <p className="text-sm text-gray-600">
-                      {formatCurrency(payment.amount)}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs ${
-                      payment.status === "paid"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {payment.status === "paid"
-                      ? "Đã thanh toán"
-                      : "Chưa thanh toán"}
-                  </span>
+              {isLoadingInvoices ? (
+                <div className="text-center py-2">
+                  <Loader2 className="animate-spin inline" />
                 </div>
-              ))}
+              ) : invoices.length === 0 ? (
+                <p className="text-center text-gray-500 text-sm">
+                  Chưa có hóa đơn nào
+                </p>
+              ) : (
+                invoices.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                    onClick={() => {
+                      setCurrentInvoice(inv);
+                      setShowPaymentDetailModal(true);
+                    }}
+                  >
+                    <div>
+                      <p className="text-gray-900">Tháng {inv.period}</p>
+                      <p className="text-sm text-gray-600">
+                        {formatCurrency(inv.totalAmount)}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs ${
+                        inv.status === "paid"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {inv.status === "paid"
+                        ? "Đã thanh toán"
+                        : "Chưa thanh toán"}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
           {!showPaymentHistory && (
             <button
-              onClick={() => setShowPaymentDetailModal(true)}
+              onClick={() => {
+                // Tìm hóa đơn chưa thanh toán gần nhất để hiển thị
+                const unpaid =
+                  invoices.find((i) => i.status === "unpaid") || invoices[0];
+                if (unpaid) {
+                  setCurrentInvoice(unpaid);
+                  setShowPaymentDetailModal(true);
+                } else {
+                  toast.info("Bạn không có hóa đơn nào cần thanh toán");
+                }
+              }}
               className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               Xem Chi Tiết & Thanh Toán
@@ -983,11 +1069,14 @@ export default function ResidentPortal() {
         </div>
       </div>
 
-      <InvoiceDetailModal
-        isOpen={showPaymentDetailModal}
-        onClose={() => setShowPaymentDetailModal(false)}
-        invoice={currentInvoice}
-      />
+      {/* Truyền currentInvoice vào modal */}
+      {currentInvoice && (
+        <InvoiceDetailModal
+          isOpen={showPaymentDetailModal}
+          onClose={() => setShowPaymentDetailModal(false)}
+          invoice={currentInvoice}
+        />
+      )}
 
       <VehicleRegistrationModal
         isOpen={showVehicleForm}

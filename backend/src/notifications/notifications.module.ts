@@ -8,5 +8,6 @@ import { Notification } from './entities/notification.entity';
   imports: [TypeOrmModule.forFeature([Notification])], // <--- Đăng ký
   controllers: [NotificationsController],
   providers: [NotificationsService],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}
