@@ -7,11 +7,11 @@ import { UpdateApartmentDto } from './dto/update-apartment.dto';
 export class ApartmentsController {
   constructor(private readonly apartmentsService: ApartmentsService) {}
 
-  @Post()
-  create(@Body() createApartmentDto: CreateApartmentDto) {
-    return this.apartmentsService.create(createApartmentDto);
-  }
-
+  @Post('create')
+create(@Body() createApartmentDto: CreateApartmentDto) {
+  console.log('📦 CreateApartmentDto:', createApartmentDto);
+  return this.apartmentsService.create(createApartmentDto);
+}
   @Get()
   findAll() {
     return this.apartmentsService.findAll();
@@ -23,8 +23,12 @@ export class ApartmentsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateApartmentDto: UpdateApartmentDto) {
-    return this.apartmentsService.update(+id, updateApartmentDto);
+  async update(
+    @Param('id') id: string, 
+    @Body() updateApartmentDto: UpdateApartmentDto
+  ) {
+    // Chúng ta trả về kết quả từ service đã được format lại thông tin owner/residents
+    return await this.apartmentsService.update(+id, updateApartmentDto);
   }
 
   @Delete(':id')
