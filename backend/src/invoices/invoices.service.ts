@@ -1,5 +1,5 @@
 // invoices.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Invoice } from './entities/invoice.entity';
@@ -70,7 +70,8 @@ export class InvoicesService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
+    
+    const generatedInvoiceCode = `INV-${createInvoiceDto.period}-${createInvoiceDto.building.replace(/Tòa\s+/i, '')}${createInvoiceDto.apartmentCode}`;
     try {
       // 1. Tìm Apartment dựa trên building và apartmentCode gửi từ Frontend
       const apartment = await this.apartmentRepository.findOne({
@@ -109,6 +110,11 @@ export class InvoicesService {
 
     } catch (err) {
       await queryRunner.rollbackTransaction();
+      if (err.code === '23505') {
+    throw new ConflictException(
+      `Mã hóa đơn ${generatedInvoiceCode} đã tồn tại. Vui lòng kiểm tra lại kỳ thanh toán!`
+    );
+  }
       throw err;
     } finally {
       await queryRunner.release();

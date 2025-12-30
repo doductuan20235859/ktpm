@@ -124,15 +124,22 @@ export function CreateInvoiceModal({ isOpen, onClose, onSubmit }: CreateInvoiceM
       }
     } catch (error:any) {
       console.error("Lỗi khi tạo hóa đơn:", error);
-      if (error.response && error.response.status === 404) {
-      const message = error.response.data.message;
-      setErrorMessage(message); // Lưu tin nhắn "Không tìm thấy căn hộ..."
-      if(errorMessage)
-      alert(errorMessage);
-    }
-    else{
-      alert("Không thể kết nối với máy chủ để lưu hóa đơn.");
-    }
+      const statusCode = error.response?.status;
+      const serverMsg = error.response?.data?.message;
+
+      if (statusCode === 409) {
+        // Trường hợp trùng mã hóa đơn
+        alert(
+          "Lỗi: " +
+            (serverMsg ||
+              "Hóa đơn cho căn hộ này trong kỳ này đã được tạo trước đó!")
+        );
+      } else if (statusCode === 404) {
+        // Trường hợp không tìm thấy căn hộ (lỗi bạn vừa xử lý)
+        alert(serverMsg);
+      } else {
+        alert("Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.");
+      }
     }
   }
 };
