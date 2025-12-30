@@ -67,8 +67,11 @@ export function CreateRequestModal({
       const fetchData = async () => {
         setLoadingApartments(true);
         try {
+          const token = localStorage.getItem("accessToken");
           // Fetch apartments
-          const apartmentsResponse = await fetch('http://localhost:3001/apartments');
+          const apartmentsResponse = await fetch('http://localhost:3001/apartments', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (apartmentsResponse.ok) {
             const data = await apartmentsResponse.json();
             setApartments(data);
@@ -78,7 +81,9 @@ export function CreateRequestModal({
 
           // Fetch admin user
           try {
-            const usersResponse = await fetch('http://localhost:3001/users');
+            const usersResponse = await fetch('http://localhost:3001/users', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
             if (usersResponse.ok) {
               const users = await usersResponse.json();
               // Find admin user

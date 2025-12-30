@@ -86,7 +86,10 @@ export default function RequestManagementPage() {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const response = await fetch("http://localhost:3001/requests");
+        const token = localStorage.getItem("accessToken");
+        const response = await fetch("http://localhost:3001/requests", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (response.ok) {
           const data = await response.json();
           console.log("Backend requests data:", data);
@@ -134,11 +137,11 @@ export default function RequestManagementPage() {
           }));
           setRequests(transformedData);
         } else {
-          console.error("Failed to fetch requests:", response.status);
+          toast.error(`Failed to fetch requests: ${response.status}`);
           setRequests([]);
         }
       } catch (error) {
-        console.error("Error fetching requests:", error);
+        toast.error(`Error fetching requests: ${error instanceof Error ? error.message : String(error)}`);
         setRequests([]);
       } finally {
         setLoading(false);
@@ -315,6 +318,7 @@ export default function RequestManagementPage() {
 
   const handleCreateRequest = async (formData: RequestFormData) => {
     try {
+      const token = localStorage.getItem("accessToken");
       const payload = {
         title: formData.title,
         description: formData.description,
@@ -327,6 +331,7 @@ export default function RequestManagementPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -368,6 +373,7 @@ export default function RequestManagementPage() {
   const handleEditRequest = async (updatedData: RequestUpdateData) => {
     if (selectedRequest) {
       try {
+        const token = localStorage.getItem("accessToken");
         const payload: any = {
           title: updatedData.title,
           description: updatedData.description,
@@ -385,6 +391,7 @@ export default function RequestManagementPage() {
             method: "PATCH",
             headers: {
               "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(payload),
           }
@@ -426,10 +433,14 @@ export default function RequestManagementPage() {
 
   const handleDeleteRequest = async (requestId: string) => {
     try {
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(
         `http://localhost:3001/requests/${requestId}`,
         {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
       if (response.ok) {

@@ -89,7 +89,10 @@ export function EditRequestModal({
     if (isOpen) {
       const fetchApartments = async () => {
         try {
-          const response = await fetch("http://localhost:3001/apartments");
+          const token = localStorage.getItem("accessToken");
+          const response = await fetch("http://localhost:3001/apartments", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (response.ok) {
             const data = await response.json();
             setApartments(data);
