@@ -53,21 +53,35 @@ const fetchInvoicesFromDB = async () => {
     const mappedData = dbData.map((item: any) => ({
       id: item.id.toString(),
       // Lấy invoiceCode từ JSON và gán vào invoiceNo để hiển thị ở bảng
-      invoiceNo: item.invoiceCode, 
-      // Mapping căn hộ 
-      apartmentCode: item.apartment.code, 
+      invoiceNo: item.invoiceCode,
+      // Mapping căn hộ
+      apartmentCode: item.apartment.code,
       // Cắt chuỗi lấy YYYY-MM
-      period: item.periodDate.substring(0, 7), 
+      period: item.periodDate.substring(0, 7),
       // Chuyển string "1500000.00" thành số để tính toán
       totalAmount: Number(item.totalAmount),
       // paidAmount
       paidAmount: Number(item.paidAmount),
       // status
-      status: calculateStatus(item.totalAmount, item.paidAmount, new Date(item.dueDate)),
+      status: calculateStatus(
+        item.totalAmount,
+        item.paidAmount,
+        new Date(item.dueDate)
+      ),
       dueDate: new Date(item.dueDate),
       // Định dạng ngày hiển thị: 20/11/2024
       displayDueDate: new Date(item.dueDate).toLocaleDateString("vi-VN"),
-      items: [] 
+      items: (item.items || []).map(
+        (subItem: any): InvoiceItem => ({
+          id: subItem.id.toString(),
+          feeType: subItem.feeType,
+          description: subItem.description,
+          amount: Number(subItem.amount),
+          // Logic cho trường 'paid': Ví dụ nếu số tiền của item này nằm trong khoản đã thu
+          // Hoặc nếu bạn có trường status riêng cho từng item ở DB
+          paid: Number(item.paidAmount) >= Number(item.totalAmount),
+        })
+      ),
     }));
 
     setInvoices(mappedData);
@@ -527,6 +541,7 @@ useEffect(() => {
           };
           setCreatedInvoiceData(completeInvoiceData);
           setShowSuccessModal(true);
+          fetchInvoicesFromDB(); // Refresh danh sách hóa đơn
         }}
       />
 
