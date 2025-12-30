@@ -5,8 +5,14 @@ import {
   OneToMany,
   CreateDateColumn,
 } from 'typeorm';
-import { AmenityStatus } from '../../common/enums/database.enums';
 import { AmenityBooking } from './amenity-booking.entity';
+
+// ĐẢM BẢO CÓ TỪ KHÓA EXPORT Ở ĐÂY
+export enum AmenityStatus {
+  ACTIVE = 'ACTIVE',
+  TEMPORARY_CLOSED = 'TEMPORARY_CLOSED',
+  MAINTENANCE = 'MAINTENANCE',
+}
 
 @Entity('amenities')
 export class Amenity {
@@ -40,10 +46,13 @@ export class Amenity {
   @Column({ name: 'requires_approval', default: true })
   requiresApproval: boolean;
 
-  @Column({ type: 'enum', enum: AmenityStatus, default: AmenityStatus.ACTIVE })
+  @Column({
+    type: 'enum',
+    enum: AmenityStatus,
+    default: AmenityStatus.ACTIVE,
+  })
   status: AmenityStatus;
 
-  // Postgres Array Type
   @Column('text', { array: true, nullable: true })
   rules: string[];
 

@@ -1,74 +1,63 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AmenityBooking } from './entities/amenity-booking.entity';
+import { Booking } from './entities/booking.entity';
 import { Amenity } from './entities/amenity.entity';
-import { BookingStatus } from '../common/enums/database.enums';
 
 @Injectable()
 export class BookingsService {
   constructor(
-    @InjectRepository(AmenityBooking)
-    private readonly bookingRepository: Repository<AmenityBooking>,
+    @InjectRepository(Booking)
+    private bookingRepository: Repository<Booking>,
     @InjectRepository(Amenity)
-    private readonly amenityRepository: Repository<Amenity>,
+    private amenityRepository: Repository<Amenity>,
   ) {}
 
+  // Lấy tất cả lịch đặt để Admin quản lý hoặc Frontend check trống
+  async findAll(): Promise<Booking[]> {
+    return await this.bookingRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // Logic tạo lịch đặt mới từ cư dân
   async createBooking(
     amenityId: number,
     userId: number,
     bookingDate: string,
     timeSlot: string,
-  ) {
+  ): Promise<Booking> {
+    // 1. Kiểm tra xem tiện ích có tồn tại không
     const amenity = await this.amenityRepository.findOne({
       where: { id: amenityId },
     });
-    if (!amenity) throw new NotFoundException('Tiện ích không tồn tại');
-
-    const existingBooking = await this.bookingRepository.findOne({
-      where: {
-        amenity: { id: amenityId },
-        bookingDate: new Date(bookingDate),
-        timeSlot: timeSlot,
-        status: BookingStatus.APPROVED,
-      },
-    });
-
-    if (existingBooking) {
-      throw new BadRequestException('Khung giờ này đã được đặt chỗ');
+    if (!amenity) {
+      throw new NotFoundException('Không tìm thấy tiện ích này');
     }
 
-    const booking = this.bookingRepository.create({
-      amenity: { id: amenityId },
-      user: { id: userId },
-      bookingDate: new Date(bookingDate),
+    // 2. Tạo đối tượng booking mới
+    const newBooking = this.bookingRepository.create({
+      amenityId,
+      userId,
+      bookingDate,
       timeSlot,
-      status: amenity.requiresApproval
-        ? BookingStatus.PENDING
-        : BookingStatus.APPROVED,
+      amenityName: amenity.name, // Lưu tên để hiển thị nhanh ở Frontend
+      status: 'PENDING',
     });
 
-    return await this.bookingRepository.save(booking);
+    return await this.bookingRepository.save(newBooking);
   }
 
-  async findAll() {
-    return await this.bookingRepository.find({
-      relations: ['amenity', 'user'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
+  // Cập nhật trạng thái (Duyệt/Từ chối) bởi Admin
   async updateStatus(
     id: number,
-    status: BookingStatus,
+    status: string,
     adminResponse?: string,
-  ) {
+  ): Promise<Booking> {
     const booking = await this.bookingRepository.findOne({ where: { id } });
-    if (!booking) throw new NotFoundException('Không tìm thấy đơn đặt chỗ');
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy lịch đặt này');
+    }
 
     booking.status = status;
     if (adminResponse) {

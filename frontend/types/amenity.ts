@@ -15,6 +15,8 @@ export interface Amenity {
   maxCapacity: number;
   rules: string[];
   bookingSlots: string[];
+  isActive: boolean; 
+  status: 'ACTIVE' | 'SUSPENDED' | 'MAINTENANCE';
 }
 
 export interface Booking {
@@ -25,4 +27,5 @@ export interface Booking {
   timeSlot: string;
   status: BookingStatus;
   adminResponse?: string;
+  userId: number; 
 }
