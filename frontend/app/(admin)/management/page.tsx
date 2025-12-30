@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -30,7 +30,7 @@ import {
 import { DeleteConfirmModal } from "@/components/shared/DeleteConfirmModal";
 import { toast } from "sonner";
 
-type RequestStatus = "NEW" | "IN_PROGRESS" | "RESOLVED";
+type RequestStatus = "NEW" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 type Priority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 type Category =
   | "ELECTRIC"
@@ -61,93 +61,9 @@ interface Request {
   }>;
 }
 
-// Generate mock data
-const generateMockRequests = (): Request[] => {
-  const statuses: RequestStatus[] = ["NEW", "IN_PROGRESS", "RESOLVED"];
-  const priorities: Priority[] = ["LOW", "NORMAL", "HIGH", "CRITICAL"];
-  const categories: Category[] = [
-    "ELECTRIC",
-    "WATER",
-    "SECURITY",
-    "CLEANING",
-    "ELEVATOR",
-    "OTHER",
-  ];
-  const buildings = ["Tòa A", "Tòa B", "Tòa C", "Tòa D"];
-  const titles = [
-    "Thang máy bị kẹt",
-    "Rò rỉ nước tại hành lang",
-    "Đèn hành lang không sáng",
-    "Vệ sinh bể nước ngầm",
-    "Kiểm tra camera an ninh",
-    "Tiếng ồn từ máy bơm",
-    "Cửa sắt tầng hầm hỏng",
-    "Sửa chữa hệ thống báo cháy",
-    "Kiểm tra máy phát điện",
-    "Vệ sinh khu vực sảnh",
-  ];
-  const names = [
-    "Nguyễn Văn An",
-    "Trần Thị Bảo",
-    "Lê Văn Cường",
-    "Phạm Thị Dung",
-    "Hoàng Văn Em",
-  ];
-  const assignees = [
-    "Kỹ thuật Phạm Đức",
-    "Điện Lực Nguyễn",
-    "Vệ sinh Công ty ABC",
-    "Kỹ thuật An ninh",
-    "Bảo vệ",
-  ];
-
-  const requests: Request[] = [];
-  for (let i = 1; i <= 50; i++) {
-    const building = buildings[Math.floor(Math.random() * buildings.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    requests.push({
-      id: `${i}`,
-      ticketCode: `REQ-2024-${String(i).padStart(3, "0")}`,
-      title: titles[Math.floor(Math.random() * titles.length)],
-      apartmentCode: `${building.split(" ")[1]}-${
-        Math.floor(Math.random() * 9) + 1
-      }${String(Math.floor(Math.random() * 12) + 1).padStart(2, "0")}`,
-      building: building,
-      category: categories[Math.floor(Math.random() * categories.length)],
-      priority: priorities[Math.floor(Math.random() * priorities.length)],
-      status: status,
-      createdDate: `${Math.floor(Math.random() * 15) + 1}/12/2024 ${String(
-        Math.floor(Math.random() * 24)
-      ).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(
-        2,
-        "0"
-      )}`,
-      createdBy: names[Math.floor(Math.random() * names.length)],
-      assignedTo:
-        status !== "NEW"
-          ? assignees[Math.floor(Math.random() * assignees.length)]
-          : undefined,
-      description: "Mô tả chi tiết về vấn đề cần xử lý",
-      notes:
-        status === "RESOLVED"
-          ? [
-              {
-                id: "1",
-                author: "Admin",
-                content: "Đã hoàn thành",
-                date: "16/12/2024 10:00",
-              },
-            ]
-          : [],
-    });
-  }
-  return requests;
-};
-
-const mockRequests = generateMockRequests();
-
 export default function RequestManagementPage() {
-  const [requests, setRequests] = useState<Request[]>(mockRequests);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -155,6 +71,10 @@ export default function RequestManagementPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [appliedDateRange, setAppliedDateRange] = useState({
+    from: "",
+    to: "",
+  });
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateRequestModalOpen, setIsCreateRequestModalOpen] =
@@ -162,9 +82,120 @@ export default function RequestManagementPage() {
   const [isEditRequestModalOpen, setIsEditRequestModalOpen] = useState(false);
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] =
     useState(false);
+
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/requests");
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Backend requests data:", data);
+          // Transform data to match frontend interface
+          const transformedData = data.map((req: any) => ({
+            id: req.id.toString(),
+            ticketCode: req.ticketCode || `REQ-${req.id}`,
+            title: req.title,
+            apartmentCode: req.apartment?.code || "N/A",
+            building: req.apartment?.building?.name || "N/A",
+            category: req.category,
+            priority: req.priority,
+            status: req.status,
+            // Format: dd/mm/yyyy hh:mm từ createdAt
+            createdDate: req.createdAt
+              ? new Date(req.createdAt)
+                  .toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                  .replace(",", "")
+              : "N/A",
+            createdBy:
+              req.createdBy?.name || req.createdByName || "Ban quản lý",
+            assignedTo: req.assignedTo?.name,
+            description: req.description || "",
+            notes:
+              req.notes?.map((note: any) => ({
+                id: note.id.toString(),
+                author: note.author?.name || "N/A",
+                content: note.content,
+                date: new Date(note.createdAt)
+                  .toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                  .replace(",", ""),
+              })) || [],
+          }));
+          setRequests(transformedData);
+        } else {
+          console.error("Failed to fetch requests:", response.status);
+          setRequests([]);
+        }
+      } catch (error) {
+        console.error("Error fetching requests:", error);
+        setRequests([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRequests();
+  }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    statusFilter,
+    buildingFilter,
+    priorityFilter,
+    categoryFilter,
+    appliedDateRange,
+  ]);
   const itemsPerPage = 10;
 
-  // Filter logic
+  // Filter logic - convert ngày thành YYYY-MM-DD để so sánh
+  const extractDateOnly = (dateStr: string): string => {
+    try {
+      // Handle both formats: "d/m/yyyy hh:mm" or "dd/mm/yyyy hh:mm"
+      const datePart = dateStr.split(" ")[0];
+      if (!datePart) return "";
+      const parts = datePart.split("/");
+      if (parts.length !== 3) return "";
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      return "";
+    }
+  };
+
+  // Helper to format date for display: dd/mm/yyyy hh:mm
+  const formatDateForDisplay = (date: Date | string): string => {
+    try {
+      const d = typeof date === "string" ? new Date(date) : date;
+      return d
+        .toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+        .replace(",", "");
+    } catch (e) {
+      return "N/A";
+    }
+  };
+
   const filteredRequests = requests.filter((req) => {
     const matchesSearch =
       req.ticketCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -180,12 +211,27 @@ export default function RequestManagementPage() {
     const matchesCategory =
       categoryFilter === "ALL" || req.category === categoryFilter;
 
+    // Date filter - simple string comparison
+    let matchesDate = true;
+    if (appliedDateRange.from || appliedDateRange.to) {
+      const reqDateStr = extractDateOnly(req.createdDate);
+      if (reqDateStr) {
+        if (appliedDateRange.from) {
+          matchesDate = matchesDate && reqDateStr >= appliedDateRange.from;
+        }
+        if (appliedDateRange.to) {
+          matchesDate = matchesDate && reqDateStr <= appliedDateRange.to;
+        }
+      }
+    }
+
     return (
       matchesSearch &&
       matchesStatus &&
       matchesBuilding &&
       matchesPriority &&
-      matchesCategory
+      matchesCategory &&
+      matchesDate
     );
   });
 
@@ -205,6 +251,12 @@ export default function RequestManagementPage() {
         label: "Mới",
         icon: AlertCircle,
       },
+      ASSIGNED: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-700",
+        label: "Đã giao",
+        icon: UserCircle,
+      },
       IN_PROGRESS: {
         bg: "bg-orange-100",
         text: "text-orange-700",
@@ -215,6 +267,12 @@ export default function RequestManagementPage() {
         bg: "bg-green-100",
         text: "text-green-700",
         label: "Đã giải quyết",
+        icon: CheckCircle,
+      },
+      CLOSED: {
+        bg: "bg-gray-100",
+        text: "text-gray-700",
+        label: "Đã đóng",
         icon: CheckCircle,
       },
     };
@@ -255,54 +313,136 @@ export default function RequestManagementPage() {
     );
   };
 
-  const handleCreateRequest = (formData: RequestFormData) => {
-    const newRequest: Request = {
-      id: `${requests.length + 1}`,
-      ticketCode: `REQ-2024-${String(requests.length + 1).padStart(3, "0")}`,
-      title: formData.title,
-      apartmentCode: formData.apartmentCode,
-      building: formData.building,
-      category: formData.category,
-      priority: formData.priority,
-      status: "NEW",
-      createdDate: new Date().toLocaleString(),
-      createdBy: formData.createdBy,
-      description: formData.description,
-      notes: [],
-    };
-    setRequests([...requests, newRequest]);
-    toast.success("Yêu cầu đã được tạo thành công!");
-    setIsCreateRequestModalOpen(false);
-  };
-
-  const handleEditRequest = (updatedData: RequestUpdateData) => {
-    if (selectedRequest) {
-      setRequests((prev) =>
-        prev.map((req) =>
-          req.id === selectedRequest.id
-            ? {
-                ...req,
-                title: updatedData.title,
-                apartmentCode: updatedData.apartmentCode,
-                building: updatedData.building,
-                category: updatedData.category,
-                priority: updatedData.priority,
-                status: updatedData.status,
-                description: updatedData.description,
-                assignedTo: updatedData.assignedTo,
-              }
-            : req
-        )
-      );
-      toast.success("Yêu cầu đã được cập nhật thành công!");
-      setIsEditRequestModalOpen(false);
+  const handleCreateRequest = async (formData: RequestFormData) => {
+    try {
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        priority: formData.priority,
+        apartmentId: formData.apartmentId,
+        createdByUserId: formData.createdByUserId || 1,
+      };
+      const response = await fetch("http://localhost:3001/requests/admin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        const newRequest = await response.json();
+        const transformed = {
+          id: newRequest.id.toString(),
+          ticketCode: newRequest.ticketCode || `REQ-${newRequest.id}`,
+          title: newRequest.title,
+          apartmentCode: newRequest.apartment?.code || "N/A",
+          building: newRequest.apartment?.building?.name || "N/A",
+          category: newRequest.category,
+          priority: newRequest.priority,
+          status: newRequest.status,
+          createdDate: formatDateForDisplay(newRequest.createdAt),
+          createdBy: newRequest.createdBy?.name || "Ban quản lý",
+          assignedTo: newRequest.assignedTo?.name,
+          description: newRequest.description,
+          notes:
+            newRequest.notes?.map((note: any) => ({
+              id: note.id.toString(),
+              author: note.author?.name || "N/A",
+              content: note.content,
+              date: formatDateForDisplay(note.createdAt),
+            })) || [],
+        };
+        setRequests([...requests, transformed]);
+        toast.success("Yêu cầu đã được tạo thành công!");
+        setIsCreateRequestModalOpen(false);
+      } else {
+        toast.error("Lỗi khi tạo yêu cầu!");
+      }
+    } catch (error) {
+      console.error("Error creating request:", error);
+      toast.error("Lỗi khi tạo yêu cầu!");
     }
   };
 
-  const handleDeleteRequest = (requestId: string) => {
-    setRequests((prev) => prev.filter((req) => req.id !== requestId));
-    toast.success("Yêu cầu đã được xóa thành công!");
-    setIsDeleteConfirmModalOpen(false);
+  const handleEditRequest = async (updatedData: RequestUpdateData) => {
+    if (selectedRequest) {
+      try {
+        const payload: any = {
+          title: updatedData.title,
+          description: updatedData.description,
+          category: updatedData.category,
+          priority: updatedData.priority,
+          status: updatedData.status,
+        };
+        // Only include apartmentId if it's defined
+        if (updatedData.apartmentId !== undefined) {
+          payload.apartmentId = updatedData.apartmentId;
+        }
+        const response = await fetch(
+          `http://localhost:3001/requests/${selectedRequest.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+        if (response.ok) {
+          const updatedRequest = await response.json();
+          // Transform and update state
+          const transformed = {
+            ...selectedRequest,
+            title: updatedRequest.title,
+            category: updatedRequest.category,
+            priority: updatedRequest.priority,
+            status: updatedRequest.status,
+            description: updatedRequest.description,
+            apartmentCode:
+              updatedRequest.apartment?.code || selectedRequest.apartmentCode,
+            building:
+              updatedRequest.apartment?.buildingName ||
+              selectedRequest.building,
+            createdBy:
+              updatedRequest.createdBy?.name || selectedRequest.createdBy,
+          };
+          setRequests((prev) =>
+            prev.map((req) =>
+              req.id === selectedRequest.id ? transformed : req
+            )
+          );
+          toast.success("Yêu cầu đã được cập nhật thành công!");
+          setIsEditRequestModalOpen(false);
+        } else {
+          toast.error("Lỗi khi cập nhật yêu cầu!");
+        }
+      } catch (error) {
+        console.error("Error updating request:", error);
+        toast.error("Lỗi khi cập nhật yêu cầu!");
+      }
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001/requests/${requestId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        setRequests((prev) => prev.filter((req) => req.id !== requestId));
+        toast.success("Yêu cầu đã được xóa thành công!");
+        setIsDeleteConfirmModalOpen(false);
+      } else {
+        toast.error("Lỗi khi xóa yêu cầu!");
+      }
+    } catch (error) {
+      console.error("Error deleting request:", error);
+      toast.error("Lỗi khi xóa yêu cầu!");
+    }
   };
 
   return (
@@ -392,6 +532,12 @@ export default function RequestManagementPage() {
                   }
                   className="text-sm border-none outline-none w-32"
                 />
+                <button
+                  onClick={() => setAppliedDateRange(dateRange)}
+                  className="px-3 py-1 ml-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Tìm kiếm
+                </button>
               </div>
             </div>
 
@@ -460,6 +606,7 @@ export default function RequestManagementPage() {
                     setPriorityFilter("ALL");
                     setCategoryFilter("ALL");
                     setDateRange({ from: "", to: "" });
+                    setAppliedDateRange({ from: "", to: "" });
                   }}
                   className="text-sm text-blue-600 hover:text-blue-700 whitespace-nowrap"
                 >
@@ -539,6 +686,9 @@ export default function RequestManagementPage() {
                         Trạng Thái
                       </th>
                       <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Thời Gian Tạo
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
                         Hành Động
                       </th>
                     </tr>
@@ -557,7 +707,10 @@ export default function RequestManagementPage() {
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
-                              <div className="text-blue-600 cursor-pointer hover:underline">
+                              <div
+                                className="text-blue-600 cursor-pointer hover:underline"
+                                onClick={() => setSelectedRequest(request)}
+                              >
                                 {request.ticketCode}
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
@@ -617,6 +770,11 @@ export default function RequestManagementPage() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-600">
+                              {request.createdDate}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setSelectedRequest(request)}
@@ -637,8 +795,11 @@ export default function RequestManagementPage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  setSelectedRequest(request);
-                                  setIsDeleteConfirmModalOpen(true);
+                                  if (
+                                    confirm("Bạn có chắc muốn xóa yêu cầu này?")
+                                  ) {
+                                    handleDeleteRequest(request.id);
+                                  }
                                 }}
                                 className="p-1 hover:bg-gray-100 rounded transition-colors"
                                 title="Xóa"
@@ -732,10 +893,10 @@ export default function RequestManagementPage() {
         {selectedRequest && (
           <RequestDetailModal
             request={selectedRequest}
+            isOpen={!!selectedRequest}
             onClose={() => setSelectedRequest(null)}
-            onUpdate={(updatedRequest) => {
-              setSelectedRequest(null);
-            }}
+            onEdit={() => setIsEditRequestModalOpen(true)}
+            onDelete={() => setIsDeleteConfirmModalOpen(true)}
           />
         )}
 

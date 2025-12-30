@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,12 +19,18 @@ interface CreateRequestModalProps {
 
 export interface RequestFormData {
   title: string;
-  apartmentCode: string;
-  building: string;
+  apartmentId: number;
   category: Category;
   priority: Priority;
   description: string;
   createdBy: string;
+  createdByUserId?: number;
+}
+
+interface Apartment {
+  id: number;
+  code: string;
+  buildingName: string;
 }
 
 export function CreateRequestModal({
@@ -34,17 +40,91 @@ export function CreateRequestModal({
 }: CreateRequestModalProps) {
   const [formData, setFormData] = useState<RequestFormData>({
     title: "",
-    apartmentCode: "",
-    building: "",
+    apartmentId: 0,
     category: "OTHER",
     priority: "NORMAL",
     description: "",
     createdBy: "Ban quản lý",
   });
 
+  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [loadingApartments, setLoadingApartments] = useState(false);
+  const [apartmentSearch, setApartmentSearch] = useState("");
+  const [showApartmentDropdown, setShowApartmentDropdown] = useState(false);
+  const [adminUserId, setAdminUserId] = useState<number | null>(null);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (field: keyof RequestFormData, value: string) => {
+  const filteredApartments = apartments.filter(apt =>
+    apt.code.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+    apt.buildingName.toLowerCase().includes(apartmentSearch.toLowerCase())
+  );
+
+  const selectedApartment = apartments.find(apt => apt.id === formData.apartmentId);
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchData = async () => {
+        setLoadingApartments(true);
+        try {
+          // Fetch apartments
+          const apartmentsResponse = await fetch('http://localhost:3001/apartments');
+          if (apartmentsResponse.ok) {
+            const data = await apartmentsResponse.json();
+            setApartments(data);
+          } else {
+            console.error('Failed to fetch apartments');
+          }
+
+          // Fetch admin user
+          try {
+            const usersResponse = await fetch('http://localhost:3001/users');
+            if (usersResponse.ok) {
+              const users = await usersResponse.json();
+              // Find admin user
+              const adminUser = users.find((user: any) => user.role === 'ADMIN');
+              if (adminUser) {
+                setAdminUserId(adminUser.id);
+                setFormData((prev) => ({
+                  ...prev,
+                  createdBy: adminUser.name || 'Ban quản lý',
+                }));
+              } else {
+                // No admin user found, set default
+                setAdminUserId(1);
+                setFormData((prev) => ({
+                  ...prev,
+                  createdBy: 'Ban quản lý',
+                }));
+              }
+            } else {
+              // Fetch failed, set default
+              setAdminUserId(1);
+              setFormData((prev) => ({
+                ...prev,
+                createdBy: 'Ban quản lý',
+              }));
+            }
+          } catch (error) {
+            console.warn('Error fetching users, using default admin:', error);
+            // Set default values if fetch fails
+            setAdminUserId(1);
+            setFormData((prev) => ({
+              ...prev,
+              createdBy: 'Ban quản lý',
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching data:', error);
+        } finally {
+          setLoadingApartments(false);
+        }
+      };
+      fetchData();
+    }
+  }, [isOpen]);
+
+  const handleInputChange = (field: keyof RequestFormData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user types
     if (errors[field]) {
@@ -59,12 +139,8 @@ export function CreateRequestModal({
       newErrors.title = "Vui lòng nhập tiêu đề";
     }
 
-    if (!formData.apartmentCode.trim()) {
-      newErrors.apartmentCode = "Vui lòng nhập mã căn hộ";
-    }
-
-    if (!formData.building.trim()) {
-      newErrors.building = "Vui lòng nhập tên tòa nhà";
+    if (!formData.apartmentId) {
+      newErrors.apartmentId = "Vui lòng chọn căn hộ";
     }
 
     if (!formData.description.trim()) {
@@ -83,7 +159,10 @@ export function CreateRequestModal({
     e.preventDefault();
 
     if (validateForm()) {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        createdByUserId: adminUserId || undefined,
+      });
       toast.success("Tạo yêu cầu thành công!", {
         description: `Mã yêu cầu: REQ-2024-${String(
           Math.floor(Math.random() * 1000)
@@ -97,13 +176,14 @@ export function CreateRequestModal({
   const handleClose = () => {
     setFormData({
       title: "",
-      apartmentCode: "",
-      building: "",
+      apartmentId: 0,
       category: "OTHER",
       priority: "NORMAL",
       description: "",
       createdBy: "Ban quản lý",
     });
+    setApartmentSearch("");
+    setShowApartmentDropdown(false);
     setErrors({});
     onClose();
   };
@@ -165,52 +245,49 @@ export function CreateRequestModal({
                 )}
               </div>
 
-              {/* Apartment Code, Building, and Created By */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
+              {/* Apartment and Created By */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="relative">
                   <label className="block text-sm text-gray-700 mb-2">
-                    Mã căn hộ <span className="text-red-500">*</span>
+                    Căn hộ <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    value={formData.apartmentCode}
-                    onChange={(e) =>
-                      handleInputChange("apartmentCode", e.target.value)
-                    }
-                    placeholder="VD: A-101, BQL"
+                    value={selectedApartment ? `${selectedApartment.code} - ${selectedApartment.buildingName}` : apartmentSearch}
+                    onChange={(e) => {
+                      setApartmentSearch(e.target.value);
+                      setFormData(prev => ({ ...prev, apartmentId: 0 }));
+                      setShowApartmentDropdown(true);
+                    }}
+                    onFocus={() => setShowApartmentDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowApartmentDropdown(false), 200)}
+                    placeholder="Gõ để tìm căn hộ..."
+                    disabled={loadingApartments}
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                      errors.apartmentCode
-                        ? "border-red-500"
-                        : "border-gray-300"
+                      errors.apartmentId ? "border-red-500" : "border-gray-300"
                     }`}
                   />
-                  {errors.apartmentCode && (
-                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.apartmentCode}
-                    </p>
+                  {showApartmentDropdown && filteredApartments.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredApartments.map((apt) => (
+                        <div
+                          key={apt.id}
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, apartmentId: apt.id }));
+                            setApartmentSearch("");
+                            setShowApartmentDropdown(false);
+                          }}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                        >
+                          {apt.code} - {apt.buildingName}
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">
-                    Tòa nhà <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.building}
-                    onChange={(e) =>
-                      handleInputChange("building", e.target.value)
-                    }
-                    placeholder="Nhập tên tòa nhà"
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                      errors.building ? "border-red-500" : "border-gray-300"
-                    }`}
-                  />
-                  {errors.building && (
+                  {errors.apartmentId && (
                     <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
-                      {errors.building}
+                      {errors.apartmentId}
                     </p>
                   )}
                 </div>
@@ -222,11 +299,8 @@ export function CreateRequestModal({
                   <input
                     type="text"
                     value={formData.createdBy}
-                    onChange={(e) =>
-                      handleInputChange("createdBy", e.target.value)
-                    }
-                    placeholder="Nhập tên người tạo"
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                    readOnly
+                    className={`w-full px-4 py-3 border rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed ${
                       errors.createdBy ? "border-red-500" : "border-gray-300"
                     }`}
                   />

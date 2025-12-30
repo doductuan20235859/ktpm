@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Upload, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,7 +10,13 @@ type Category =
   | "CLEANING"
   | "ELEVATOR"
   | "OTHER";
-type RequestStatus = "NEW" | "IN_PROGRESS" | "RESOLVED";
+type RequestStatus = "NEW" | "ASSIGNED" | "CLOSED" | "IN_PROGRESS" | "RESOLVED";
+
+interface Apartment {
+  id: number;
+  code: string;
+  buildingName: string;
+}
 
 interface EditRequestModalProps {
   isOpen: boolean;
@@ -40,6 +46,7 @@ export interface RequestUpdateData {
   description: string;
   assignedTo?: string;
   attachments?: string[];
+  apartmentId?: number;
 }
 
 export function EditRequestModal({
@@ -60,17 +67,69 @@ export function EditRequestModal({
     attachments: [],
   });
 
+  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [apartmentSearch, setApartmentSearch] = useState("");
+  const [showApartmentDropdown, setShowApartmentDropdown] = useState(false);
   const [attachmentPreviews, setAttachmentPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const filteredApartments = apartments.filter(
+    (apt) =>
+      apt.code.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+      apt.buildingName.toLowerCase().includes(apartmentSearch.toLowerCase())
+  );
+
+  const selectedApartment = apartments.find(
+    (apt) => apt.id === formData.apartmentId
+  );
+
+  // Fetch apartments
+  useEffect(() => {
+    if (isOpen) {
+      const fetchApartments = async () => {
+        try {
+          const response = await fetch("http://localhost:3001/apartments");
+          if (response.ok) {
+            const data = await response.json();
+            setApartments(data);
+            // Match apartment by code
+            const matchingApt = data.find(
+              (apt: Apartment) => apt.code === request.apartmentCode
+            );
+            if (matchingApt) {
+              setFormData((prev) => ({ ...prev, apartmentId: matchingApt.id }));
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching apartments:", error);
+        }
+      };
+      fetchApartments();
+    }
+  }, [isOpen, request.apartmentCode]);
+
   if (!isOpen) return null;
 
-  const handleInputChange = (field: keyof RequestUpdateData, value: string) => {
+  const handleInputChange = (
+    field: keyof RequestUpdateData,
+    value: string | number
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+  };
+
+  const handleSelectApartment = (apartment: Apartment) => {
+    setFormData((prev) => ({
+      ...prev,
+      apartmentId: apartment.id,
+      apartmentCode: apartment.code,
+      building: apartment.buildingName,
+    }));
+    setApartmentSearch("");
+    setShowApartmentDropdown(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,12 +178,8 @@ export function EditRequestModal({
       newErrors.title = "Vui lòng nhập tiêu đề";
     }
 
-    if (!formData.apartmentCode.trim()) {
-      newErrors.apartmentCode = "Vui lòng nhập mã căn hộ";
-    }
-
-    if (!formData.building.trim()) {
-      newErrors.building = "Vui lòng chọn tòa nhà";
+    if (!formData.apartmentCode.trim() || !formData.building.trim()) {
+      newErrors.apartmentCode = "Vui lòng chọn căn hộ";
     }
 
     if (!formData.description.trim()) {
@@ -137,7 +192,10 @@ export function EditRequestModal({
 
   const handleSubmit = () => {
     if (validateForm()) {
+      toast.success("Đang cập nhật yêu cầu...", { duration: 2000 });
       onUpdate(formData);
+    } else {
+      toast.error("Vui lòng điền đầy đủ thông tin", { duration: 3000 });
     }
   };
 
@@ -191,8 +249,6 @@ export function EditRequestModal({
     },
   ];
 
-  const buildingOptions = ["Tòa A", "Tòa B", "Tòa C", "Tòa D"];
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -222,7 +278,7 @@ export function EditRequestModal({
                 type="text"
                 value={formData.title}
                 onChange={(e) => handleInputChange("title", e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   errors.title ? "border-red-500" : "border-gray-300"
                 }`}
                 placeholder="Nhập tiêu đề yêu cầu"
@@ -232,54 +288,50 @@ export function EditRequestModal({
               )}
             </div>
 
-            {/* Building and Apartment Code */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">
-                  Tòa Nhà <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.building}
-                  onChange={(e) =>
-                    handleInputChange("building", e.target.value)
-                  }
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.building ? "border-red-500" : "border-gray-300"
-                  }`}
-                >
-                  <option value="">Chọn tòa nhà</option>
-                  {buildingOptions.map((building) => (
-                    <option key={building} value={building}>
-                      {building}
-                    </option>
+            {/* Apartment */}
+            <div className="relative">
+              <label className="block text-sm text-gray-700 mb-2">
+                Căn hộ <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={
+                  selectedApartment
+                    ? `${selectedApartment.code} - ${selectedApartment.buildingName}`
+                    : apartmentSearch
+                }
+                onChange={(e) => {
+                  setApartmentSearch(e.target.value);
+                  setFormData((prev) => ({ ...prev, apartmentId: undefined }));
+                  setShowApartmentDropdown(true);
+                }}
+                onFocus={() => setShowApartmentDropdown(true)}
+                onBlur={() =>
+                  setTimeout(() => setShowApartmentDropdown(false), 200)
+                }
+                placeholder="Gõ để tìm căn hộ..."
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.apartmentCode ? "border-red-500" : "border-gray-300"
+                }`}
+              />
+              {showApartmentDropdown && filteredApartments.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredApartments.map((apt) => (
+                    <div
+                      key={apt.id}
+                      onClick={() => handleSelectApartment(apt)}
+                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {apt.code} - {apt.buildingName}
+                    </div>
                   ))}
-                </select>
-                {errors.building && (
-                  <p className="text-xs text-red-500 mt-1">{errors.building}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">
-                  Mã Căn Hộ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.apartmentCode}
-                  onChange={(e) =>
-                    handleInputChange("apartmentCode", e.target.value)
-                  }
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.apartmentCode ? "border-red-500" : "border-gray-300"
-                  }`}
-                  placeholder="VD: A-101"
-                />
-                {errors.apartmentCode && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.apartmentCode}
-                  </p>
-                )}
-              </div>
+                </div>
+              )}
+              {errors.apartmentCode && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.apartmentCode}
+                </p>
+              )}
             </div>
 
             {/* Category and Priority */}

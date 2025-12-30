@@ -27,11 +27,13 @@ interface Request {
 
 interface RequestDetailModalProps {
   request: Request;
+  isOpen: boolean;
   onClose: () => void;
-  onUpdate: (request: Request) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-export function RequestDetailModal({ request, onClose, onUpdate }: RequestDetailModalProps) {
+export function RequestDetailModal({ request, isOpen, onClose, onEdit, onDelete }: RequestDetailModalProps) {
   const [status, setStatus] = useState(request.status);
   const [assignedTo, setAssignedTo] = useState(request.assignedTo || '');
   const [newNote, setNewNote] = useState('');
@@ -82,16 +84,6 @@ export function RequestDetailModal({ request, onClose, onUpdate }: RequestDetail
 
     setNotes([...notes, note]);
     setNewNote('');
-  };
-
-  const handleSave = () => {
-    const updatedRequest = {
-      ...request,
-      status,
-      assignedTo,
-      notes,
-    };
-    onUpdate(updatedRequest);
   };
 
   return (
@@ -250,13 +242,19 @@ export function RequestDetailModal({ request, onClose, onUpdate }: RequestDetail
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
           >
-            Hủy
+            Đóng
           </button>
           <button
-            onClick={handleSave}
+            onClick={onEdit}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Lưu Thay Đổi
+            Chỉnh Sửa
+          </button>
+          <button
+            onClick={onDelete}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Xóa
           </button>
         </div>
       </div>
