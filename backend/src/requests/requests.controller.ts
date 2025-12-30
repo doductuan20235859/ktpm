@@ -28,7 +28,7 @@ export class RequestsController {
 
   @Get('my-requests')
   findAllMyRequests(@Req() req) {
-    return this.requestsService.findAllMyRequests(req.user.userId);
+    return this.requestsService.findAllMyRequests(req.user);
   }
 
   @Post('admin')

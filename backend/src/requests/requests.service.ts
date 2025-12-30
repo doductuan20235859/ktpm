@@ -40,9 +40,13 @@ export class RequestsService {
   }
 
   // Hàm lấy danh sách yêu cầu của user (để hiển thị list bên dưới)
-  async findAllMyRequests(userId: number) {
+  async findAllMyRequests(user: any) {
+    const whereCondition = user.role === 'RESIDENT' 
+      ? { apartment: { id: user.apartmentId } }
+      : { createdBy: { id: user.userId } };
+    
     return await this.requestsRepository.find({
-      where: { createdBy: { id: userId } },
+      where: whereCondition,
       order: { createdAt: 'DESC' }, // Mới nhất lên đầu
       relations: ['createdBy', 'apartment'], // Join bảng nếu cần
     });

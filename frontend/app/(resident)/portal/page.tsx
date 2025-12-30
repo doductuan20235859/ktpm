@@ -269,7 +269,7 @@ export default function ResidentPortal() {
         const data = await res.json();
         const mappedData = data.map((item: any) => ({
           id: item.id,
-          ticketCode: item.ticketCode,
+          ticketCode: item.ticketCode || `REQ-${item.id}`,
           title: item.title,
           createdDate: new Date(item.createdAt).toLocaleDateString("vi-VN", {
             day: "2-digit",

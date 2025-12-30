@@ -116,13 +116,13 @@ export default function RequestManagementPage() {
                   .replace(",", "")
               : "N/A",
             createdBy:
-              req.createdBy?.name || req.createdByName || "Ban quản lý",
+              req.createdBy?.role === 'ADMIN' ? 'Ban Quản Lý' : req.createdBy?.fullName || 'N/A',
             assignedTo: req.assignedTo?.name,
             description: req.description || "",
             notes:
               req.notes?.map((note: any) => ({
                 id: note.id.toString(),
-                author: note.author?.name || "N/A",
+                author: note.user?.role === 'ADMIN' ? 'Ban Quản Lý' : note.user?.fullName || 'N/A',
                 content: note.content,
                 date: new Date(note.createdAt)
                   .toLocaleString("en-GB", {
@@ -347,13 +347,13 @@ export default function RequestManagementPage() {
           priority: newRequest.priority,
           status: newRequest.status,
           createdDate: formatDateForDisplay(newRequest.createdAt),
-          createdBy: newRequest.createdBy?.name || "Ban quản lý",
+          createdBy: newRequest.createdBy?.role === 'ADMIN' ? 'Ban Quản Lý' : newRequest.createdBy?.fullName || 'N/A',
           assignedTo: newRequest.assignedTo?.name,
           description: newRequest.description,
           notes:
             newRequest.notes?.map((note: any) => ({
               id: note.id.toString(),
-              author: note.author?.name || "N/A",
+              author: note.author?.role === 'ADMIN' ? 'Ban Quản Lý' : note.author?.fullName || 'N/A',
               content: note.content,
               date: formatDateForDisplay(note.createdAt),
             })) || [],
@@ -412,7 +412,7 @@ export default function RequestManagementPage() {
               updatedRequest.apartment?.buildingName ||
               selectedRequest.building,
             createdBy:
-              updatedRequest.createdBy?.name || selectedRequest.createdBy,
+              updatedRequest.createdBy?.role === 'ADMIN' ? 'Ban Quản Lý' : updatedRequest.createdBy?.fullName || selectedRequest.createdBy,
           };
           setRequests((prev) =>
             prev.map((req) =>
