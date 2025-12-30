@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   Search,
   Filter,
@@ -163,25 +164,96 @@ export default function ApartmentManagement() {
     setIsEditOpen(true);
   };
 
-  const handleUpdate = async (formData: any) => {
-    try {
-      const res = await fetch(`http://localhost:3001/apartments/${selectedApartment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          areaSqm: formData.area,
-          status: formData.status,
-        }),
-      });
-      if (res.ok) {
-        setIsEditOpen(false);
-        fetchData();
-      }
-    } catch (error) {
-      console.error("Lỗi cập nhật:", error);
-    }
-  };
+ const handleUpdate = async (formData: any) => {
+  // try {
+  //   const res = await fetch(`
+  //     ${selectedApartment.id}`, {
+  //     method: 'PATCH',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({
+  //       code: formData.code,        // Thêm mã căn hộ
+  //       areaSqm: formData.area,    // Map diện tích sang areaSqm
+  //       status: formData.status,    // Trạng thái căn hộ
+  //       ownerPhone: formData.phone, // Gửi số điện thoại để Backend xử lý owner_id
+  //     }),
+  //   });
 
+  //   if (res.ok) {
+  //     const updatedApartment = await res.json(); // Lấy dữ liệu đã format từ Backend trả về
+
+  //     // Cập nhật state cục bộ thay vì gọi lại fetchData() để giao diện mượt hơn
+  //     setApartments((prev) =>
+  //       prev.map((item) =>
+  //         item.id === updatedApartment.id 
+  //           ? { 
+  //               ...item, 
+  //               ...updatedApartment, 
+  //               // Đồng bộ key giữa Backend và Table Frontend
+  //               area: updatedApartment.areaSqm, 
+  //               owner: updatedApartment.ownerName,
+  //               phone: updatedApartment.ownerPhone 
+  //             } 
+  //           : item
+  //       )
+  //     );
+
+  //     setIsEditOpen(false);
+  //     toast.success("Cập nhật thành công!");
+  //   } else {
+  //     const errorData = await res.json();
+  //     toast.error(errorData.message || "Cập nhật thất bại");
+  //   }
+  // } catch (error) {
+  //   console.error("Lỗi cập nhật:", error);
+  //   toast.error("Không thể kết nối đến máy chủ");
+  // }
+
+try {
+    const res = await fetch(`http://localhost:3001/apartments/${selectedApartment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: formData.code,
+        areaSqm: Number(formData.area),
+        status: formData.status,
+        ownerPhone: formData.phone, // Số điện thoại mới
+        ownerName: formData.owner,  // Tên chủ hộ mới (Đã thêm trường này)
+      }),
+    });
+
+    if (res.ok) {
+      // 1. Backend trả về Object căn hộ đầy đủ từ hàm findOne(id)
+      const updatedApartment = await res.json(); 
+
+      // 2. Cập nhật State danh sách để giao diện thay đổi ngay lập tức
+      setApartments((prev) =>
+        prev.map((item) =>
+          item.id === updatedApartment.id 
+            ? { 
+                ...item, 
+                ...updatedApartment, 
+                // Quan trọng: Map lại các key Backend sang key Table đang dùng
+                area: updatedApartment.areaSqm, 
+                owner: updatedApartment.ownerName, // fullName từ quan hệ owner
+                phone: updatedApartment.ownerPhone  // phoneNumber từ quan hệ owner
+              } 
+            : item
+        )
+      );
+
+      setIsEditOpen(false); // Đóng Modal
+      toast.success("Cập nhật thông tin căn hộ thành công!"); 
+    } else {
+      // Xử lý lỗi trả về từ ValidationPipe của NestJS
+      const errorData = await res.json();
+      toast.error(Array.isArray(errorData.message) ? errorData.message[0] : errorData.message);
+    }
+  } catch (error) {
+    console.error("Lỗi cập nhật:", error);
+    toast.error("Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
+  }
+
+};
   /* =======================
       FILTER & STATS
   ======================= */

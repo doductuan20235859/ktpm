@@ -130,32 +130,33 @@
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`http://localhost:3001/apartments/${apartment.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code: formData.code,
-          areaSqm: formData.area, // Lưu ý: Backend dùng areaSqm
-          status: formData.status,
-          // Nếu bạn muốn cập nhật thông tin chủ hộ, backend cần xử lý ownerId
-        }),
-      });
+      // const response = await fetch(`http://localhost:3001/apartments/${apartment.id}`, {
+      //   method: 'PATCH',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     code: formData.code,
+      //     areaSqm: formData.area, // Lưu ý: Backend dùng areaSqm
+      //     status: formData.status,
+      //     // Nếu bạn muốn cập nhật thông tin chủ hộ, backend cần xử lý ownerId
+      //   }),
+      // });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Lỗi cập nhật");
-      }
+      // if (!response.ok) {
+      //   const errorData = await response.json();
+      //   throw new Error(errorData.message || "Lỗi cập nhật");
+      // }
 
-      const updatedData = await response.json();
+      // const updatedData = await response.json();
       
-      toast.success("Cập nhật căn hộ thành công!");
-      onUpdate(updatedData); // Gọi callback để cập nhật lại danh sách ở trang cha
-      onClose(); // Đóng modal
+      // toast.success("Cập nhật căn hộ thành công!");
+      // onUpdate(updatedData); // Gọi callback để cập nhật lại danh sách ở trang cha
+      // onClose(); // Đóng modal
+      await onUpdate(formData); 
+    onClose();
     } catch (error: any) {
-      toast.error(error.message || "Không thể kết nối đến máy chủ");
-      console.error("Update error:", error);
+      toast.error(error.message || "Lỗi cập nhật");
     } finally {
       setIsSubmitting(false);
     }

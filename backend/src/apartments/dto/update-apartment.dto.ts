@@ -1,6 +1,4 @@
 
-
-
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateApartmentDto } from './create-apartment.dto';
 import { IsOptional, IsEnum, IsNumber, IsString } from 'class-validator';
@@ -10,6 +8,10 @@ export class UpdateApartmentDto extends PartialType(CreateApartmentDto) {
   @IsOptional()
   @IsString()
   code?: string;
+
+  @IsOptional()
+  @IsString()
+  ownerPhone?: string;
 
   @IsOptional()
   @IsNumber()
@@ -22,6 +24,10 @@ export class UpdateApartmentDto extends PartialType(CreateApartmentDto) {
   @IsOptional()
   @IsNumber()
   ownerId?: number; // Dùng ID để cập nhật chủ sở hữu thay vì tên text
+
+  @IsOptional()
+  @IsString()
+  ownerName?: string;
 
   @IsOptional()
   @IsString()
