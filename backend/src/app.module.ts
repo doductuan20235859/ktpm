@@ -13,6 +13,7 @@ import { RequestsModule } from './requests/requests.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { AmenitiesModule } from './amenities/amenities.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { InvoiceItemsModule } from './invoice_items/invoice_items.module';
 import { ServeStaticModule } from '@nestjs/serve-static'; // <--- Import này
 import { join } from 'path';
 @Module({
@@ -48,6 +49,7 @@ import { join } from 'path';
     InvoicesModule,
     AmenitiesModule,
     NotificationsModule,
+    InvoiceItemsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

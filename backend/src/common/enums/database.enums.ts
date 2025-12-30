@@ -46,11 +46,11 @@ export enum RequestStatus {
   RESOLVED = 'RESOLVED',
   CLOSED = 'CLOSED',
 }
-export enum InvoiceFee {
+export enum InvoiceItemsFeeType {
   MANAGEMENT = 'MANAGEMENT',
-  SERVICE = 'SERVICE',
   PARKING = 'PARKING',
   WATER = 'WATER',
+  SERVICE = 'SERVICE',
   ELECTRIC = 'ELECTRIC',
   INTERNET = 'INTERNET',
   OTHER = 'OTHER',

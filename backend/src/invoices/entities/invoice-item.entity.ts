@@ -6,7 +6,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Invoice } from './invoice.entity';
-import { InvoiceFee } from '../../common/enums/database.enums';
+import { InvoiceItemsFeeType } from '../../common/enums/database.enums';
 
 @Entity('invoice_items')
 export class InvoiceItem {
@@ -17,12 +17,24 @@ export class InvoiceItem {
   @JoinColumn({ name: 'invoice_id' })
   invoice: Invoice;
 
-  @Column({ name: 'fee_type', type: 'enum', enum: InvoiceFee })
-  feeType: InvoiceFee;
+    // Nếu vẫn muốn truy cập trực tiếp invoiceId dưới dạng number
+  @Column({ name: 'invoice_id', type: 'integer' })
+  invoiceId: number;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ name: 'fee_type', type: 'enum', enum: InvoiceItemsFeeType })
+  feeType: InvoiceItemsFeeType;
+
+  @Column({ type: 'character varying', length: 255, nullable: true })
   description: string;
 
-  @Column('decimal', { precision: 15, scale: 2 })
+@Column({
+    type: 'numeric',
+    precision: 15,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => (value ? parseFloat(value) : 0),
+    },
+  })
   amount: number;
 }
