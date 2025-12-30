@@ -24,6 +24,7 @@ interface Apartment {
   status: 'OCCUPIED_OWNER' | 'OCCUPIED_TENANT' | 'AVAILABLE' | 'VACANT' | 'MAINTENANCE';
   members: Member[];
   history: ResidencyHistory[];
+
 }
 
 interface ApartmentDetailModalProps {
@@ -97,10 +98,7 @@ export function ApartmentDetailModal({ apartment, onClose }: ApartmentDetailModa
                 <p className="text-sm text-gray-600">Số Điện Thoại</p>
                 <p className="text-lg text-gray-900">{apartment.phone}</p>
               </div>
-            </div>
-          </div>
-
-          {/* Members Section */}
+              {/* Members Section */}
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg text-gray-900 mb-4 flex items-center gap-2">
               <UsersIcon className="w-5 h-5 text-blue-600" />
@@ -120,21 +118,23 @@ export function ApartmentDetailModal({ apartment, onClose }: ApartmentDetailModa
                       <p className="text-gray-900">{member.name}</p>
                       <p className="text-sm text-gray-600">{member.phone}</p>
                       <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                        <Calendar className="w-3 h-3" />
-                        Tham gia: {member.joinDate}
+                        
                       </p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs ${getRoleBadge(member.role)}`}>
+                  {/* <span className={`px-3 py-1 rounded-full text-xs ${getRoleBadge(member.role)}`}>
                     {member.role === 'OWNER' && 'Chủ hộ'}
                     {member.role === 'TENANT' && 'Người thuê'}
                     {member.role === 'MEMBER' && 'Thành viên'}
-                  </span>
+                  </span> */}
                 </div>
               ))}
             </div>
           </div>
+            </div>
+          </div>
 
+          
           {/* History Section */}
           <div className="p-6">
             <h3 className="text-lg text-gray-900 mb-4 flex items-center gap-2">
@@ -175,9 +175,7 @@ export function ApartmentDetailModal({ apartment, onClose }: ApartmentDetailModa
           >
             Đóng
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            Cập Nhật Thông Tin
-          </button>
+          
         </div>
       </div>
     </div>

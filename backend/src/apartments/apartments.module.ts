@@ -8,11 +8,11 @@ import { ApartmentsController } from './apartments.controller';
 import { Apartment } from './entities/apartment.entity';
 import { ApartmentResident } from './entities/apartment-resident.entity';
 import { ResidencyHistory } from './entities/residency-history.entity';
-
+import { User } from '../users/entities/user.entity';
 @Module({
   imports: [
     // QUAN TRỌNG: Đăng ký Entity để TypeORM nhận diện
-    TypeOrmModule.forFeature([Apartment, ApartmentResident, ResidencyHistory]),
+    TypeOrmModule.forFeature([Apartment, ApartmentResident, ResidencyHistory, User]),
   ],
   controllers: [ApartmentsController],
   providers: [ApartmentsService],
