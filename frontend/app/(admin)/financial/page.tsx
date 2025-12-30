@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import {
   Search,
   Filter,
@@ -24,7 +25,8 @@ interface Invoice {
   totalAmount: number;
   paidAmount: number;
   status: InvoiceStatus;
-  dueDate: string;
+  dueDate: Date;          // Để là Date nếu bạn lưu đối tượng
+  displayDueDate: string; // Để là string cho bản đã format
   items: InvoiceItem[];
 }
 
@@ -36,189 +38,102 @@ interface InvoiceItem {
   paid: boolean;
 }
 
-const mockInvoices: Invoice[] = [
-  {
-    id: "1",
-    invoiceNo: "INV-2024-12-001",
-    apartmentCode: "A-101",
-    period: "2024-12",
-    totalAmount: 2850000,
-    paidAmount: 2850000,
-    status: "PAID",
-    dueDate: "15/12/2024",
-    items: [
-      {
-        id: "1",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 1200000,
-        paid: true,
-      },
-      {
-        id: "2",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 850000,
-        paid: true,
-      },
-      {
-        id: "3",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô",
-        amount: 800000,
-        paid: true,
-      },
-    ],
-  },
-  {
-    id: "2",
-    invoiceNo: "INV-2024-12-002",
-    apartmentCode: "A-102",
-    period: "2024-12",
-    totalAmount: 3250000,
-    paidAmount: 1500000,
-    status: "PARTIAL",
-    dueDate: "15/12/2024",
-    items: [
-      {
-        id: "4",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 1500000,
-        paid: true,
-      },
-      {
-        id: "5",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 950000,
-        paid: false,
-      },
-      {
-        id: "6",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô + xe máy",
-        amount: 800000,
-        paid: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    invoiceNo: "INV-2024-12-003",
-    apartmentCode: "B-201",
-    period: "2024-12",
-    totalAmount: 4200000,
-    paidAmount: 0,
-    status: "OVERDUE",
-    dueDate: "10/12/2024",
-    items: [
-      {
-        id: "7",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 2000000,
-        paid: false,
-      },
-      {
-        id: "8",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 1200000,
-        paid: false,
-      },
-      {
-        id: "9",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô",
-        amount: 1000000,
-        paid: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    invoiceNo: "INV-2024-12-004",
-    apartmentCode: "B-202",
-    period: "2024-12",
-    totalAmount: 2650000,
-    paidAmount: 0,
-    status: "PUBLISHED",
-    dueDate: "20/12/2024",
-    items: [
-      {
-        id: "10",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 1150000,
-        paid: false,
-      },
-      {
-        id: "11",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 800000,
-        paid: false,
-      },
-      {
-        id: "12",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe xe máy",
-        amount: 700000,
-        paid: false,
-      },
-    ],
-  },
-  {
-    id: "5",
-    invoiceNo: "INV-2024-12-005",
-    apartmentCode: "C-301",
-    period: "2024-12",
-    totalAmount: 5100000,
-    paidAmount: 0,
-    status: "PUBLISHED",
-    dueDate: "20/12/2024",
-    items: [
-      {
-        id: "13",
-        feeType: "Phí quản lý",
-        description: "Phí quản lý tháng 12/2024",
-        amount: 2500000,
-        paid: false,
-      },
-      {
-        id: "14",
-        feeType: "Dịch vụ",
-        description: "Phí dịch vụ chung cư",
-        amount: 1600000,
-        paid: false,
-      },
-      {
-        id: "15",
-        feeType: "Giữ xe",
-        description: "Phí giữ xe ô tô",
-        amount: 1000000,
-        paid: false,
-      },
-    ],
-  },
-];
-
 export default function FinancialManagement() {
-  const [invoices] = useState<Invoice[]>(mockInvoices);
+  // Khởi tạo là mảng rỗng thay vì dùng dữ liệu mock
+const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+// Thêm hàm này để gọi API
+const fetchInvoicesFromDB = async () => {
+  try {
+    const response = await axios.get("http://localhost:3001/invoices");
+    
+    // Trích xuất mảng từ object { "data": [...] }
+    const dbData = response.data.data; 
+
+    const mappedData = dbData.map((item: any) => ({
+      id: item.id.toString(),
+      // Lấy invoiceCode từ JSON và gán vào invoiceNo để hiển thị ở bảng
+      invoiceNo: item.invoiceCode,
+      // Mapping căn hộ
+      apartmentCode: item.apartment.code,
+      // Cắt chuỗi lấy YYYY-MM
+      period: item.periodDate.substring(0, 7),
+      // Chuyển string "1500000.00" thành số để tính toán
+      totalAmount: Number(item.totalAmount),
+      // paidAmount
+      paidAmount: Number(item.paidAmount),
+      // status
+      status: calculateStatus(
+        item.totalAmount,
+        item.paidAmount,
+        new Date(item.dueDate)
+      ),
+      dueDate: new Date(item.dueDate),
+      // Định dạng ngày hiển thị: 20/11/2024
+      displayDueDate: new Date(item.dueDate).toLocaleDateString("vi-VN"),
+      items: (item.items || []).map(
+        (subItem: any): InvoiceItem => ({
+          id: subItem.id.toString(),
+          feeType: subItem.feeType,
+          description: subItem.description,
+          amount: Number(subItem.amount),
+          // Logic cho trường 'paid': Ví dụ nếu số tiền của item này nằm trong khoản đã thu
+          // Hoặc nếu bạn có trường status riêng cho từng item ở DB
+          paid: Number(item.paidAmount) >= Number(item.totalAmount),
+        })
+      ),
+    }));
+
+    setInvoices(mappedData);
+  } catch (error) {
+    console.error("Lỗi kết nối API:", error);
+  }
+};
+// Gọi hàm này ngay khi trang vừa load
+useEffect(() => {
+  fetchInvoicesFromDB();
+}, []);
   const [periodFilter, setPeriodFilter] = useState("2024-12");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [showReceiptEntry, setShowReceiptEntry] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
-
+  const [createdInvoiceData, setCreatedInvoiceData] = useState<any>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
     }).format(value);
   };
+
+  const calculateStatus = (total: number, paid: number, dueDateStr: Date): string => {
+  const remaining = total - paid;
+  const dueDate = dueDateStr;
+  const now = new Date();
+  
+  // 1. Nếu tiền còn phải trả là 0 -> PAID
+  if (remaining <= 0) return "PAID";
+
+  // 2. Kiểm tra xem đã quá hạn chưa
+  const isOverdue = now > dueDate;
+
+  if (isOverdue) {
+    // Nếu quá hạn mà vẫn còn nợ -> OVERDUE
+    return "OVERDUE";
+  } else {
+    // Nếu chưa quá hạn
+    if (paid > 0) {
+      // Đã trả một phần -> PARTIAL
+      return "PARTIAL";
+    } else {
+      // Chưa thanh toán đồng nào -> PUBLISHED
+      return "PUBLISHED";
+    }
+  }
+};
 
   const getStatusBadge = (status: InvoiceStatus) => {
     const styles = {
@@ -243,7 +158,13 @@ export default function FinancialManagement() {
         icon: DollarSign,
       },
     };
-    return styles[status];
+    // Logic: Nếu tìm thấy status trong danh sách trên thì dùng, 
+  // không thì trả về một object có cấu trúc tương tự để không lỗi .bg
+  return styles[status] || { 
+    bg: "bg-gray-100 text-gray-500", 
+    label: status || "Đang tải...", // Hiển thị chính cái status đó nếu có
+    icon: Clock 
+  };
   };
 
   // Filter logic
@@ -271,7 +192,7 @@ export default function FinancialManagement() {
   };
 
   if (showReceiptEntry) {
-    return <ReceiptEntry onBack={() => setShowReceiptEntry(false)} />;
+    return <ReceiptEntry onBack={() => {setShowReceiptEntry(false), fetchInvoicesFromDB()}} />;
   }
 
   return (
@@ -442,7 +363,7 @@ export default function FinancialManagement() {
                       {formatCurrency(remaining)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {invoice.dueDate}
+                      {invoice.displayDueDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -511,7 +432,7 @@ export default function FinancialManagement() {
                 <div>
                   <p className="text-sm text-gray-600">Hạn thanh toán</p>
                   <p className="text-lg text-gray-900">
-                    {selectedInvoice.dueDate}
+                    {selectedInvoice.displayDueDate}
                   </p>
                 </div>
                 <div>
@@ -592,14 +513,123 @@ export default function FinancialManagement() {
       )}
 
       {/* Create Invoice Modal */}
-      <CreateInvoiceModal
+      {/* <CreateInvoiceModal
         isOpen={showCreateInvoiceModal}
         onClose={() => setShowCreateInvoiceModal(false)}
         onSubmit={(invoiceData) => {
           console.log("Tạo hóa đơn:", invoiceData);
           // Add logic to save invoice here
         }}
+      /> */}
+
+      {/* Create Invoice Modal */}
+      <CreateInvoiceModal
+        isOpen={showCreateInvoiceModal}
+        onClose={() => setShowCreateInvoiceModal(false)}
+        onSubmit={(invoiceData) => {
+          console.log('Tạo hóa đơn:', invoiceData);
+          // Add logic to save invoice here
+          // Bổ sung thông tin cho hóa đơn mới
+          const completeInvoiceData = {
+            ...invoiceData,
+            // status: 'PUBLISHED' as InvoiceStatus,
+            // paidAmount: 0,
+            // items: invoiceData.items.map((item: any) => ({
+            //   ...item,
+            //   paid: false,
+            // })),
+          };
+          setCreatedInvoiceData(completeInvoiceData);
+          setShowSuccessModal(true);
+          fetchInvoicesFromDB(); // Refresh danh sách hóa đơn
+        }}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && createdInvoiceData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl text-white">Tạo Hóa Đơn Thành Công</h2>
+                <p className="text-sm text-green-100 mt-1">Hóa đơn mới đã được tạo thành công</p>
+              </div>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="text-white hover:bg-green-500 p-2 rounded-lg transition-colors"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-sm text-gray-600">Căn hộ</p>
+                  <p className="text-lg text-gray-900">{createdInvoiceData?.building?.replace(/Tòa\s+/i, '')}-{createdInvoiceData?.apartmentCode}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Kỳ thanh toán</p>
+                  <p className="text-lg text-gray-900">{createdInvoiceData?.period}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Hạn thanh toán</p>
+                  <p className="text-lg text-gray-900">{new Date(createdInvoiceData.dueDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Trạng thái</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm ${getStatusBadge(createdInvoiceData?.status).bg}`}>
+                    {getStatusBadge(createdInvoiceData?.status).label}
+                  </span>
+                </div>
+              </div>
+
+              <h3 className="text-lg text-gray-900 mb-4">Chi tiết khoản thu</h3>
+              <div className="space-y-3 mb-6">
+                {(createdInvoiceData?.items ?? []).map((item: InvoiceItem, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-gray-900">{item.feeType}</p>
+                      <p className="text-sm text-gray-600">{item.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-gray-900">{formatCurrency(item.amount)}</p>
+                      {item.paid && (
+                        <span className="text-xs text-green-600">✓ Đã thanh toán</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Tổng tiền:</span>
+                  <span className="text-gray-900">{formatCurrency(createdInvoiceData?.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Đã thanh toán:</span>
+                  <span className="text-green-600">{formatCurrency(createdInvoiceData?.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between text-lg">
+                  <span className="text-gray-900">Còn lại:</span>
+                  <span className="text-red-600">{formatCurrency(createdInvoiceData?.totalAmount - createdInvoiceData?.paidAmount)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                In Hóa Đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { InvoiceItem } from './entities/invoice-item.entity';
 import { Apartment } from '../apartments/entities/apartment.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, InvoiceItem, Apartment])], // <--- Đăng ký
+  imports: [TypeOrmModule.forFeature([Invoice, InvoiceItem,Apartment])], // <--- Đăng ký
   controllers: [InvoicesController],
   providers: [InvoicesService],
 })

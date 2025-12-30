@@ -1,47 +1,43 @@
-import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsDateString,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
-import { InvoiceFee, InvoiceStatus } from '../../common/enums/database.enums';
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
+import { InvoiceItemDto } from "../../invoice_items/dto/create-invoice_item.dto";
+import { Type } from "class-transformer";
 
-// DTO cho từng khoản mục phí bên trong
-class CreateInvoiceItemDto {
-  @IsEnum(InvoiceFee)
-  feeType: InvoiceFee;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsNumber()
-  amount: number;
-}
-
-// DTO cho hóa đơn tổng
+// create-invoice.dto.ts
 export class CreateInvoiceDto {
-  @IsNotEmpty()
-  @IsNumber()
-  apartmentId: number; // ID căn hộ nhận hóa đơn
-
-  @IsDateString()
-  periodDate: string; // Kỳ thanh toán (VD: 2024-12-01)
-
-  @IsDateString()
-  dueDate: string; // Hạn thanh toán
-
-  @IsOptional()
+  
   @IsString()
+  @IsNotEmpty()
+  building: string;
+  
+  @IsString()
+  @IsNotEmpty()
+  apartmentCode: string;
+
+  @IsString()
+  @IsNotEmpty()
+  period: string;
+
+  @IsString()
+  @IsNotEmpty()
+  dueDate: string;
+
+  @IsString()
+  @IsOptional()
   notes?: string;
 
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateInvoiceItemDto)
-  items: CreateInvoiceItemDto[];
+  @IsNumber()
+  totalAmount: number;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsNumber()
+  paidAmount: number;
+
+  @IsArray() // Đảm bảo nhận được mảng items từ frontend
+  @ValidateNested({ each: true }) // Kiểm tra tất cả các phần tử trong mảng
+  @Type(() => InvoiceItemDto)    // Xác định kiểu dữ liệu của phần tử là InvoiceItemDto
+  @IsOptional()
+  items: InvoiceItemDto[];
 }

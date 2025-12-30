@@ -37,22 +37,20 @@ export class Invoice {
   })
   totalAmount: number;
 
-  @Column({ type: 'enum', enum: InvoiceStatus, default: InvoiceStatus.UNPAID })
-  status: InvoiceStatus;
-
   @Column('text', { nullable: true })
   notes: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
-  @Column({
+
+  @Column('decimal', {
     name: 'paid_amount',
-    type: 'decimal',
     precision: 15,
     scale: 2,
     default: 0,
   })
   paidAmount: number;
+
   @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true })
   items: InvoiceItem[];
 }
