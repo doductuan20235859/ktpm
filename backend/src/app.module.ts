@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { InvoiceItemsModule } from './invoice_items/invoice_items.module';
 import { ServeStaticModule } from '@nestjs/serve-static'; // <--- Import này
 import { join } from 'path';
+import { AmenityBookingsModule } from './amenity-bookings/amenity-bookings.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -50,6 +51,7 @@ import { join } from 'path';
     AmenitiesModule,
     NotificationsModule,
     InvoiceItemsModule,
+    AmenityBookingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

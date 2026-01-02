@@ -6,7 +6,7 @@ import {
   JoinColumn,
   CreateDateColumn,
 } from 'typeorm';
-import { Amenity } from './amenity.entity';
+import { Amenity } from '../../amenities/entities/amenity.entity';
 import { User } from '../../users/entities/user.entity';
 import { BookingStatus } from '../../common/enums/database.enums';
 

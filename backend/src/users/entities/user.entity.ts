@@ -14,7 +14,7 @@ import { Apartment } from '../../apartments/entities/apartment.entity';
 import { Vehicle } from '../../vehicles/entities/vehicle.entity';
 import { Request } from '../../requests/entities/request.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
-import { AmenityBooking } from '../../amenities/entities/amenity-booking.entity';
+import { AmenityBooking } from '../../amenity-bookings/entities/amenity-booking.entity';
 
 // Định nghĩa Enum ngay tại đây hoặc import từ file shared
 export enum UserRole {

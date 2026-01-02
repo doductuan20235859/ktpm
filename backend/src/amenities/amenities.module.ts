@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AmenitiesService } from './amenities.service';
 import { AmenitiesController } from './amenities.controller';
 import { Amenity } from './entities/amenity.entity';
-import { AmenityBooking } from './entities/amenity-booking.entity';
+import { AmenityBooking } from '../amenity-bookings/entities/amenity-booking.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Amenity, AmenityBooking])], // <--- Đăng ký

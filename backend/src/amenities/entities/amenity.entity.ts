@@ -6,8 +6,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { AmenityStatus } from '../../common/enums/database.enums';
-import { AmenityBooking } from './amenity-booking.entity';
-
+import { AmenityBooking } from '../../amenity-bookings/entities/amenity-booking.entity';
 @Entity('amenities')
 export class Amenity {
   @PrimaryGeneratedColumn()
