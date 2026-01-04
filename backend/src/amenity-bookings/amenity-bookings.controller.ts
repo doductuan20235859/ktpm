@@ -7,9 +7,11 @@ import {
   Body,
   Query,
   ParseIntPipe,
+  Post,
 } from '@nestjs/common';
 import { AmenityBookingsService } from './amenity-bookings.service';
 import { UpdateBookingStatusDto } from './dto/update-amenity-booking.dto';
+import { CreateBookingDto } from './dto/create-amenity-booking.dto';
 
 @Controller('amenity-bookings')
 export class AmenityBookingsController {
@@ -42,5 +44,9 @@ export class AmenityBookingsController {
   @Get('user/:id')
   findByUser(@Param('id', ParseIntPipe) id: number) {
     return this.bookingService.findByUser(id);
+  }
+  @Post()
+  create(@Body() createBookingDto: CreateBookingDto) {
+    return this.bookingService.create(createBookingDto);
   }
 }

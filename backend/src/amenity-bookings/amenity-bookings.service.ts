@@ -4,6 +4,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AmenityBooking } from './entities/amenity-booking.entity';
 import { UpdateBookingStatusDto } from './dto/update-amenity-booking.dto';
+import { CreateBookingDto } from './dto/create-amenity-booking.dto';
+import { BookingStatus } from '../common/enums/database.enums';
 
 @Injectable()
 export class AmenityBookingsService {
@@ -96,5 +98,19 @@ export class AmenityBookingsService {
       createdDate: booking.createdAt,
       adminResponse: booking.adminResponse, // Lý do từ chối (nếu có)
     }));
+  }
+  async create(createDto: CreateBookingDto) {
+    const newBooking = this.bookingRepository.create({
+      // SỬA Ở ĐÂY: Thay vì gán amenityId, hãy gán object chứa id
+      amenity: { id: createDto.amenityId },
+      user: { id: createDto.userId },
+
+      bookingDate: createDto.bookingDate, // Đảm bảo format YYYY-MM-DD
+      timeSlot: createDto.timeSlot,
+      notes: createDto.notes,
+      status: BookingStatus.PENDING, // Dùng Enum import từ file chung
+    });
+
+    return await this.bookingRepository.save(newBooking);
   }
 }

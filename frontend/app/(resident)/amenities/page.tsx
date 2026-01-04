@@ -237,6 +237,7 @@ export default function AmenitiesManagement() {
   };
 
   const handleBookingSubmit = async () => {
+    // 1. Validate
     if (!selectedAmenity || !selectedDate || !bookingForm.timeSlot) {
       alert("Vui lòng chọn đầy đủ thông tin");
       return;
@@ -250,13 +251,14 @@ export default function AmenitiesManagement() {
     }
     const user = JSON.parse(userStr);
 
-    // Format ngày gửi lên
+    // 2. Format ngày gửi lên (YYYY-MM-DD)
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
     const bookingDateStr = `${year}-${month}-${day}`;
 
     try {
+      // 3. Gọi API
       const res = await fetch("http://localhost:3001/amenity-bookings", {
         method: "POST",
         headers: {
@@ -277,16 +279,46 @@ export default function AmenitiesManagement() {
         throw new Error(err.message || "Đặt lịch thất bại");
       }
 
+      // 4. Lấy dữ liệu mới từ Backend trả về
+      const newBookingData = await res.json();
+      console.log("Booking created:", newBookingData);
+
+      // 5. Tạo object Booking chuẩn theo Interface của Frontend để hiển thị
+      // Vì Backend trả về ít thông tin hơn Frontend cần hiển thị, ta lấy thêm từ state
+      const mappedNewBooking: Booking = {
+        id: newBookingData.id.toString(),
+
+        // Backend trả về { amenity: { id: 1 } } nên ta lấy id từ đó
+        amenityId: newBookingData.amenity.id.toString(),
+
+        // Backend không trả về tên, ta lấy từ state đang chọn (selectedAmenity)
+        amenityName: selectedAmenity.name,
+
+        date: newBookingData.bookingDate,
+        timeSlot: newBookingData.timeSlot,
+        status: newBookingData.status, // "PENDING"
+
+        // Lấy thông tin user từ localStorage
+        residentName: user.fullName || "Tôi",
+        apartmentNumber: user.apartmentCode || "N/A",
+
+        createdDate: newBookingData.createdAt,
+        rejectionReason: newBookingData.adminResponse || undefined,
+      };
+
+      // 6. Cập nhật State: Thêm booking mới vào đầu danh sách myBookings
+      setMyBookings((prev) => [mappedNewBooking, ...prev]);
+
       alert("Đặt lịch thành công! Vui lòng chờ phê duyệt.");
 
-      // Reset form
+      // 7. Reset form và chuyển view
       setBookingForm({ timeSlot: "", notes: "" });
       setShowBookingForm(false);
       setSelectedView("myBookings");
 
-      // Reload trang hoặc gọi lại API để cập nhật list
-      window.location.reload();
+      // Không cần window.location.reload() nữa, UI tự cập nhật -> Mượt hơn
     } catch (error: any) {
+      console.error(error);
       alert(`Lỗi: ${error.message}`);
     }
   };
