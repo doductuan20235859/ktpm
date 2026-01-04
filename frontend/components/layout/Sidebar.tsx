@@ -54,15 +54,9 @@ export function Sidebar({ isOpen, userRole }: SidebarProps) {
         color: "text-green-600",
       },
       {
-        href: "/requests",
-        icon: FileText,
-        label: "Yêu Cầu/Phản Ánh",
-        color: "text-orange-600",
-      },
-      {
         href: "/management",
         icon: ListCheck,
-        label: "Quản Lý Yêu Cầu (Pro)",
+        label: "Quản Lý Yêu Cầu",
         color: "text-indigo-600",
       },
       {
@@ -76,12 +70,6 @@ export function Sidebar({ isOpen, userRole }: SidebarProps) {
         icon: DollarSign,
         label: "Thu Phí & Phiếu Thu",
         color: "text-emerald-600",
-      },
-      {
-        href: "/settings",
-        icon: Settings,
-        label: "Cài Đặt",
-        color: "text-gray-600",
       },
     ];
   };
