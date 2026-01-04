@@ -97,7 +97,7 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
         <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
-            <h2 className="text-2xl font-semibold text-gray-900">Add New Unit</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">Thêm Mới</h2>
             <button
               onClick={handleCancel}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -116,7 +116,7 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                   {/* Block/Building */}
                   <div>
                     <label className="block text-sm text-gray-700 mb-2">
-                      Block/Building <span className="text-red-500">*</span>
+                      Tòa  <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
@@ -124,18 +124,18 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                       onChange={(e) => setFormData({ ...formData, block: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     >
-                      <option value="">Select Block</option>
-                      <option value="A">Block A</option>
-                      <option value="B">Block B</option>
-                      <option value="C">Block C</option>
-                      <option value="D">Block D</option>
+                      <option value="">Chọn Tòa</option>
+                      <option value="A">Tòa A</option>
+                      <option value="B">Tòa B</option>
+                      <option value="C">Tòa C</option>
+                      <option value="D">Tòa D</option>
                     </select>
                   </div>
 
                   {/* Unit Number */}
                   <div>
                     <label className="block text-sm text-gray-700 mb-2">
-                      Unit Number <span className="text-red-500">*</span>
+                      Số Phòng <span className="text-red-500">*</span>
                     </label>
                     <input
                       required
@@ -150,7 +150,7 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                   {/* Floor Level */}
                   <div>
                     <label className="block text-sm text-gray-700 mb-2">
-                      Floor Level <span className="text-red-500">*</span>
+                      Tầng <span className="text-red-500">*</span>
                     </label>
                     <input
                       required
@@ -165,7 +165,7 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                   {/* Occupancy Status */}
                   <div>
                     <label className="block text-sm text-gray-700 mb-2">
-                      Occupancy Status <span className="text-red-500">*</span>
+                      Trạng Thái <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
@@ -173,9 +173,8 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as NewApartmentData['status'] })}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     >
-                      <option value="Vacant">Vacant</option>
-                    
-                      <option value="Maintenance">Maintenance</option>
+                      <option value="Vacant">Trống</option>
+                      <option value="Maintenance">Bảo trì</option>
                     </select>
                   </div>
                 </div>
@@ -188,7 +187,7 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                   {/* Area */}
                   <div>
                     <label className="block text-sm text-gray-700 mb-2">
-                      Area (m²) <span className="text-red-500">*</span>
+                      Diện Tích (m²) <span className="text-red-500">*</span>
                     </label>
                     <input
                       required
@@ -212,13 +211,13 @@ export function AddApartmentModal({ isOpen, onClose, onSave }: AddApartmentModal
                 onClick={handleCancel}
                 className="px-5 py-2.5 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors font-medium"
               >
-                Cancel
+                Hủy
               </button>
               <button
                 type="submit"
                 className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
               >
-                Create Apartment
+                Tạo Căn Hộ
               </button>
             </div>
           </form>
