@@ -14,16 +14,22 @@ import {
   Bell,
 } from "lucide-react";
 import { Calendar } from "../../../components/ui/calendar";
-
+import { useEffect } from "react"; // <--- Thêm useEffect
 interface Amenity {
   id: string;
   name: string;
   description: string;
   imageUrl: string;
-  openingHours: string;
+  openingHours: string; // Map từ openingTime và closingTime
   rules: string[];
   maxCapacity: number;
   bookingSlots: string[];
+  // Thêm trường này để check trạng thái trên lịch
+  existingBookings: {
+    bookingDate: string;
+    timeSlot: string;
+    status: string;
+  }[];
 }
 
 interface Booking {
@@ -69,283 +75,220 @@ export default function AmenitiesManagement() {
   });
   const [currentBookingsPage, setCurrentBookingsPage] = useState(1);
   const bookingsPerPage = 5;
+  const [amenities, setAmenities] = useState<Amenity[]>([]);
+  useEffect(() => {
+    const fetchAmenities = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        // Gọi API mới mà bạn đã tạo: /amenities/with-bookings
+        const res = await fetch(
+          "http://localhost:3001/amenities/with-bookings",
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
+        const rawData = await res.json();
+
+        // 2. Kiểm tra an toàn: Đảm bảo rawData là mảng, nếu không thì dùng mảng rỗng
+        const amenitiesArray = Array.isArray(rawData) ? rawData : [];
+
+        // 3. Map dữ liệu
+        const mappedAmenities: Amenity[] = amenitiesArray.map((item: any) => ({
+          id: item.id.toString(),
+          name: item.name,
+          description: item.description,
+          // Logic ảnh giữ nguyên
+          imageUrl:
+            item.imageUrl ||
+            "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7",
+          // Cắt chuỗi giờ (06:00:00 -> 06:00)
+          openingHours: `${item.openingTime.slice(
+            0,
+            5
+          )} - ${item.closingTime.slice(0, 5)}`,
+          rules: item.rules || [],
+          maxCapacity: item.maxCapacity,
+          bookingSlots: item.bookingSlots || [],
+          // Lấy danh sách booking để hiển thị trạng thái
+          existingBookings: item.bookings || [],
+        }));
+
+        setAmenities(mappedAmenities);
+      } catch (error) {
+        console.error("Lỗi lấy danh sách tiện ích:", error);
+      }
+    };
+
+    fetchAmenities();
+  }, []); // Chạy 1 lần khi mount
   // Mock data - Tiện ích
-  const amenities: Amenity[] = [
-    {
-      id: "1",
-      name: "Bể Bơi",
-      description:
-        "Bể bơi Olympic chuẩn 50m với hệ thống lọc nước hiện đại, khu vực bể trẻ em riêng biệt",
-      imageUrl:
-        "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=800&q=80",
-      openingHours: "6:00 - 22:00 (Thứ 2 - Chủ nhật)",
-      rules: [
-        "Đeo mũ bơi và đi dép bắt buộc",
-        "Tắm trước khi vào bể",
-        "Trẻ em dưới 12 tuổi phải có người lớn đi cùng",
-        "Không mang đồ ăn vào khu vực bể bơi",
-        "Đặt trước tối thiểu 24 giờ",
-      ],
-      maxCapacity: 50,
-      bookingSlots: [
-        "6:00-8:00",
-        "8:00-10:00",
-        "10:00-12:00",
-        "14:00-16:00",
-        "16:00-18:00",
-        "18:00-20:00",
-        "20:00-22:00",
-      ],
-    },
-    {
-      id: "2",
-      name: "Phòng Gym",
-      description:
-        "Phòng tập gym với thiết bị hiện đại từ Mỹ và EU, có huấn luyện viên hướng dẫn",
-      imageUrl:
-        "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
-      openingHours: "5:00 - 23:00 (Hằng ngày)",
-      rules: [
-        "Mang giày thể thao và khăn lau mặt",
-        "Lau máy sau khi sử dụng",
-        "Không la hét hoặc làm ồn",
-        "Đặt trước tối thiểu 2 giờ",
-        "Tối đa 90 phút/buổi",
-      ],
-      maxCapacity: 30,
-      bookingSlots: [
-        "5:00-7:00",
-        "7:00-9:00",
-        "9:00-11:00",
-        "11:00-13:00",
-        "14:00-16:00",
-        "16:00-18:00",
-        "18:00-20:00",
-        "20:00-22:00",
-        "22:00-23:00",
-      ],
-    },
-    {
-      id: "3",
-      name: "Sân Tennis",
-      description:
-        "Sân tennis chuẩn quốc tế với mặt sân cao su, đèn chiếu sáng tốt cho buổi tối",
-      imageUrl:
-        "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=800&q=80",
-      openingHours: "6:00 - 22:00 (Hằng ngày)",
-      rules: [
-        "Mang giày chuyên dụng tennis",
-        "Tối đa 4 người/sân",
-        "Đặt trước tối thiểu 48 giờ",
-        "Miễn phí trong 2 tiếng, sau đó tính phí 100k/giờ",
-        "Hủy trước 24 giờ để tránh bị phạt",
-      ],
-      maxCapacity: 4,
-      bookingSlots: [
-        "6:00-8:00",
-        "8:00-10:00",
-        "10:00-12:00",
-        "14:00-16:00",
-        "16:00-18:00",
-        "18:00-20:00",
-        "20:00-22:00",
-      ],
-    },
-    {
-      id: "4",
-      name: "Phòng Đa Năng",
-      description:
-        "Phòng tổ chức sự kiện, sinh nhật, họp mặt với sức chứa 100 người, có bàn ghế và âm thanh",
-      imageUrl:
-        "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80",
-      openingHours: "8:00 - 23:00 (Hằng ngày)",
-      rules: [
-        "Đặt trước tối thiểu 7 ngày",
-        "Phí sử dụng: 2 triệu/4 giờ",
-        "Dọn dẹp sau khi sử dụng",
-        "Không tổ chức hoạt động vi phạm pháp luật",
-        "Bồi thường nếu làm hư hỏng thiết bị",
-      ],
-      maxCapacity: 100,
-      bookingSlots: ["8:00-12:00", "13:00-17:00", "18:00-22:00"],
-    },
-    {
-      id: "5",
-      name: "Khu BBQ",
-      description:
-        "Khu vực nướng ngoài trời với 5 bếp than hoa, bàn ghế, view vườn cây xanh mát",
-      imageUrl:
-        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&q=80",
-      openingHours: "16:00 - 23:00 (Thứ 6, 7, CN)",
-      rules: [
-        "Đặt trước tối thiểu 3 ngày",
-        "Tự chuẩn bị đồ ăn và than",
-        "Vệ sinh khu vực sau khi sử dụng",
-        "Không gây ồn ào sau 22:00",
-        "Phí sử dụng: 500k/buổi",
-      ],
-      maxCapacity: 40,
-      bookingSlots: ["16:00-19:00", "19:00-22:00"],
-    },
-    {
-      id: "6",
-      name: "Sân Chơi Trẻ Em",
-      description:
-        "Khu vui chơi an toàn với cầu trượt, xích đu, nhà bóng và khu cát cho trẻ dưới 12 tuổi",
-      imageUrl:
-        "https://images.unsplash.com/photo-1575429198097-0414ec08e8cd?w=800&q=80",
-      openingHours: "6:00 - 20:00 (Hằng ngày)",
-      rules: [
-        "Trẻ em phải có người lớn giám sát",
-        "Không sử dụng khi trời mưa",
-        "Giữ vệ sinh chung",
-        "Không mang đồ chơi sắc nhọn",
-        "Miễn phí, không cần đặt trước",
-      ],
-      maxCapacity: 30,
-      bookingSlots: [],
-    },
-  ];
-
   // Mock data - Lịch đặt của tôi
-  const myBookings: Booking[] = [
-    {
-      id: "1",
-      amenityId: "1",
-      amenityName: "Bể Bơi",
-      date: "2024-12-18",
-      timeSlot: "18:00-20:00",
-      status: "APPROVED",
-      residentName: "Nguyễn Văn An",
-      apartmentNumber: "A-101",
-      createdDate: "2024-12-15",
-    },
-    {
-      id: "2",
-      amenityId: "2",
-      amenityName: "Phòng Gym",
-      date: "2024-12-16",
-      timeSlot: "7:00-9:00",
-      status: "PENDING",
-      residentName: "Nguyễn Văn An",
-      apartmentNumber: "A-101",
-      createdDate: "2024-12-15",
-    },
-    {
-      id: "3",
-      amenityId: "3",
-      amenityName: "Sân Tennis",
-      date: "2024-12-20",
-      timeSlot: "16:00-18:00",
-      status: "PENDING",
-      residentName: "Nguyễn Văn An",
-      apartmentNumber: "A-101",
-      createdDate: "2024-12-14",
-    },
-    {
-      id: "4",
-      amenityId: "4",
-      amenityName: "Phòng Đa Năng",
-      date: "2024-12-10",
-      timeSlot: "18:00-22:00",
-      status: "REJECTED",
-      residentName: "Nguyễn Văn An",
-      apartmentNumber: "A-101",
-      createdDate: "2024-12-01",
-      rejectionReason: "Phòng đang được bảo trì định kỳ",
-    },
-  ];
+  const [myBookings, setMyBookings] = useState<Booking[]>([]);
 
-  // Mock data - Thông báo
-  const notifications: AmenityNotification[] = [
-    {
-      id: "1",
-      type: "REMINDER",
-      title: "Nhắc nhở: Lịch bơi sắp đến",
-      message:
-        "Bạn có lịch đặt Bể Bơi vào ngày 18/12/2024 lúc 18:00-20:00. Vui lòng đến đúng giờ.",
-      date: "2024-12-17",
-      read: false,
-    },
-    {
-      id: "2",
-      type: "APPROVED",
-      title: "Lịch đặt được duyệt",
-      message:
-        "Lịch đặt Bể Bơi ngày 18/12/2024 (18:00-20:00) đã được phê duyệt.",
-      date: "2024-12-15",
-      read: true,
-    },
-    {
-      id: "3",
-      type: "REJECTED",
-      title: "Lịch đặt bị từ chối",
-      message:
-        "Lịch đặt Phòng Đa Năng ngày 10/12/2024 bị từ chối. Lý do: Phòng đang được bảo trì định kỳ.",
-      date: "2024-12-02",
-      read: true,
-    },
-    {
-      id: "4",
-      type: "SCHEDULE_CHANGE",
-      title: "Thay đổi giờ hoạt động",
-      message:
-        "Khu BBQ sẽ đóng cửa vào ngày 25/12/2024 do bảo trì hệ thống điện.",
-      date: "2024-12-14",
-      read: false,
-    },
-  ];
+  // 2. Gọi API lấy dữ liệu khi vào trang
+  // 2. Gọi API lấy dữ liệu khi vào trang
+  // 2. Gọi API lấy dữ liệu khi vào trang
+  useEffect(() => {
+    const fetchMyBookings = async () => {
+      // --- SỬA Ở ĐÂY: Đổi "user" thành "userInfo" ---
+      const userStr = localStorage.getItem("userInfo");
+      const token = localStorage.getItem("accessToken");
+
+      // Debug để xem đã lấy được chưa
+      console.log("Local Storage UserInfo:", userStr);
+      console.log("Local Storage Token:", token);
+
+      if (!userStr || !token) {
+        console.warn("⚠️ Chưa tìm thấy userInfo hoặc accessToken");
+        return;
+      }
+
+      // ... (bên trong useEffect fetchMyBookings)
+      try {
+        const user = JSON.parse(userStr);
+        // ... (giữ nguyên phần gọi fetch)
+        const res = await fetch(
+          `http://localhost:3001/amenity-bookings/user/${user.id}`,
+          {
+            // ... giữ nguyên headers
+          }
+        );
+
+        if (!res.ok) throw new Error(`Lỗi API: ${res.statusText}`);
+
+        // --- SỬA TỪ ĐÂY ---
+
+        // 1. Dữ liệu trả về là MẢNG luôn (Array)
+        const responseData = await res.json();
+
+        // 2. Kiểm tra an toàn: nếu responseData là mảng thì dùng luôn, không thì mảng rỗng
+        // KHÔNG dùng responseData.data nữa
+        const bookingsArray = Array.isArray(responseData) ? responseData : [];
+
+        // 3. Map dữ liệu
+        const mappedData: Booking[] = bookingsArray.map((item: any) => ({
+          id: item.id.toString(),
+          // Backend không trả về amenityId trong API này, gán tạm là "0"
+          amenityId: "0",
+          amenityName: item.amenityName,
+          date: item.date,
+          timeSlot: item.timeSlot,
+          status: item.status,
+
+          // Lấy tên từ userInfo (localStorage)
+          residentName: user.fullName || "Tôi",
+          apartmentNumber: user.apartmentCode || "N/A",
+
+          createdDate: item.createdDate,
+          // Map trường adminResponse vào rejectionReason để hiện lý do từ chối
+          rejectionReason: item.adminResponse,
+        }));
+
+        setMyBookings(mappedData);
+        // --- HẾT PHẦN SỬA ---
+      } catch (error) {
+        console.error("❌ Lỗi fetch bookings:", error);
+      }
+    };
+
+    fetchMyBookings();
+  }, []);
 
   // Hàm lấy trạng thái slots cho một ngày cụ thể
+  // Hàm lấy trạng thái slots dựa trên dữ liệu thật
   const getTimeSlotStatuses = (
     amenity: Amenity,
     date: Date
   ): TimeSlotStatus[] => {
-    // Mock logic - trong thực tế sẽ fetch từ API
-    const dateStr = date.toISOString().split("T")[0];
+    // 1. Chuyển ngày đang chọn sang format YYYY-MM-DD (để so sánh với database)
+    // Lưu ý: Cần xử lý múi giờ để tránh bị lệch ngày
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
 
     return amenity.bookingSlots.map((slot) => {
-      // Random status for demo
-      const random = Math.random();
-      if (
-        dateStr === "2024-12-18" &&
-        slot === "18:00-20:00" &&
-        amenity.id === "1"
-      ) {
+      // 2. Tìm xem trong danh sách existingBookings có đơn nào trùng Ngày + Giờ + Status không
+      const booking = amenity.existingBookings?.find(
+        (b) =>
+          b.bookingDate === dateStr &&
+          b.timeSlot === slot &&
+          (b.status === "APPROVED" || b.status === "PENDING")
+        // Nếu PENDING cũng coi là BOOKED để tránh đặt trùng
+      );
+
+      if (booking) {
         return {
           slot,
-          status: "BOOKED" as const,
-          bookedBy: "Nguyễn Văn An (A-101)",
+          status: "BOOKED",
+          bookedBy: "Đã đặt", // Backend admin mới thấy tên, user thường chỉ cần biết đã đặt
         };
       }
-      if (random < 0.1) {
-        return { slot, status: "MAINTENANCE" as const };
-      }
-      if (random < 0.3) {
-        return { slot, status: "BOOKED" as const, bookedBy: "Người dùng khác" };
-      }
-      return { slot, status: "AVAILABLE" as const };
+
+      // Logic bảo trì (Nếu backend có trả về status MAINTENANCE thì check ở đây)
+      // Hiện tại giả định nếu tiện ích đang status = SUSPENDED thì tất cả đều bảo trì
+      // Nhưng ở đây ta đang check từng slot, nên tạm thời để AVAILABLE
+      return { slot, status: "AVAILABLE" };
     });
   };
 
-  const handleBookingSubmit = () => {
+  const handleBookingSubmit = async () => {
     if (!selectedAmenity || !selectedDate || !bookingForm.timeSlot) {
       alert("Vui lòng chọn đầy đủ thông tin");
       return;
     }
 
-    alert(
-      `Đặt lịch thành công!\n\nTiện ích: ${
-        selectedAmenity.name
-      }\nNgày: ${selectedDate.toLocaleDateString("vi-VN")}\nGiờ: ${
-        bookingForm.timeSlot
-      }\n\nLịch đặt của bạn đang chờ Ban quản lý phê duyệt.`
-    );
+    const userStr = localStorage.getItem("userInfo");
+    const token = localStorage.getItem("accessToken");
+    if (!userStr || !token) {
+      alert("Vui lòng đăng nhập lại");
+      return;
+    }
+    const user = JSON.parse(userStr);
 
-    setBookingForm({ timeSlot: "", notes: "" });
-    setShowBookingForm(false);
-    setSelectedView("myBookings");
+    // Format ngày gửi lên
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+    const bookingDateStr = `${year}-${month}-${day}`;
+
+    try {
+      const res = await fetch("http://localhost:3001/amenity-bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amenityId: parseInt(selectedAmenity.id),
+          userId: user.id,
+          bookingDate: bookingDateStr,
+          timeSlot: bookingForm.timeSlot,
+          notes: bookingForm.notes,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Đặt lịch thất bại");
+      }
+
+      alert("Đặt lịch thành công! Vui lòng chờ phê duyệt.");
+
+      // Reset form
+      setBookingForm({ timeSlot: "", notes: "" });
+      setShowBookingForm(false);
+      setSelectedView("myBookings");
+
+      // Reload trang hoặc gọi lại API để cập nhật list
+      window.location.reload();
+    } catch (error: any) {
+      alert(`Lỗi: ${error.message}`);
+    }
   };
 
   const handleCancelBooking = (bookingId: string) => {
@@ -413,9 +356,6 @@ export default function AmenitiesManagement() {
       year: "numeric",
     });
   };
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
   return (
     <div>
       {/* Header */}
@@ -449,29 +389,11 @@ export default function AmenitiesManagement() {
             }`}
           >
             <CalendarIcon className="w-5 h-5 inline-block mr-2" />
-            Lịch Đã Đặt (
-            {
-              myBookings.filter(
-                (b) => b.status === "PENDING" || b.status === "APPROVED"
-              ).length
-            }
-            )
-          </button>
-          <button
-            onClick={() => setSelectedView("notifications")}
-            className={`flex-1 px-4 py-3 rounded-lg transition-colors relative ${
-              selectedView === "notifications"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            <Bell className="w-5 h-5 inline-block mr-2" />
-            Thông Báo
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {unreadCount}
-              </span>
-            )}
+            Lịch Đã Đặt
+            {/* SỬA Ở ĐÂY: Hiển thị tổng số lượng thay vì lọc */}
+            <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-full text-sm">
+              {myBookings.length}
+            </span>
           </button>
         </div>
       </div>
@@ -771,7 +693,9 @@ export default function AmenitiesManagement() {
                         booking.rejectionReason && (
                           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
                             <p className="text-sm text-red-700">
-                              <span className="">Lý do từ chối:</span>{" "}
+                              <span className="font-semibold">
+                                Lý do từ chối:
+                              </span>{" "}
                               {booking.rejectionReason}
                             </p>
                           </div>
@@ -838,62 +762,6 @@ export default function AmenitiesManagement() {
           )}
         </div>
       )}
-
-      {/* Notifications View */}
-      {selectedView === "notifications" && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-2xl text-gray-900 mb-6">Thông Báo Về Tiện Ích</h2>
-
-          {notifications.length === 0 ? (
-            <div className="text-center py-12">
-              <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Bạn chưa có thông báo nào</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`border-l-4 rounded-r-lg p-4 ${
-                    notification.read
-                      ? "border-gray-300 bg-gray-50"
-                      : "border-blue-500 bg-blue-50"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">
-                      {getNotificationIcon(notification.type)}
-                    </span>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3
-                          className={`text-gray-900 ${
-                            !notification.read ? "" : ""
-                          }`}
-                        >
-                          {notification.title}
-                        </h3>
-                        {!notification.read && (
-                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
-                            Mới
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-700 mb-2">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatDate(notification.date)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Booking Form Modal */}
       {showBookingForm && selectedAmenity && selectedDate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

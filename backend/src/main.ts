@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common'; // 1. Nhớ import cái này
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -24,6 +23,7 @@ async function bootstrap() {
   );
 
   // 4. Khởi chạy Server (Luôn đặt CUỐI CÙNG)
+  // 4. Đăng ký Filter (Wrapper cho lỗi)
   await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }

@@ -68,6 +68,16 @@ export class AmenitiesService {
       throw new NotFoundException(`Không tìm thấy tiện ích ID: ${id}`);
     }
   }
+  async findAllWithBookings() {
+    const amenities = await this.amenitiesRepository.find({
+      order: { id: 'ASC' },
+      relations: ['bookings'], // <--- QUAN TRỌNG: Join bảng bookings
+      // Bạn cũng có thể lấy thêm thông tin user đặt nếu cần:
+      // relations: ['bookings', 'bookings.user'],
+    });
 
+    // Tái sử dụng hàm transform cũ để đảm bảo format dữ liệu chuẩn
+    return amenities.map((item) => this.transformResponse(item));
+  }
   // --- ĐÃ XÓA HÀM updateStatus Ở ĐÂY ---
 }

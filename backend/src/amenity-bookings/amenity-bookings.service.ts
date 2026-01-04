@@ -74,4 +74,27 @@ export class AmenityBookingsService {
 
     return this.bookingRepository.save(booking);
   }
+  async findByUser(userId: number) {
+    const bookings = await this.bookingRepository.find({
+      where: {
+        user: { id: userId }, // Điều kiện lọc theo User ID
+      },
+      relations: ['amenity'], // Join bảng Amenity để lấy tên, hình ảnh...
+      order: {
+        createdAt: 'DESC', // Sắp xếp cái mới nhất lên đầu
+      },
+    });
+
+    // (Tùy chọn) Format lại dữ liệu cho gọn nếu cần,
+    // hoặc trả về nguyên gốc để Frontend tự map
+    return bookings.map((booking) => ({
+      id: booking.id,
+      amenityName: booking.amenity.name, // Lấy tên từ quan hệ amenity
+      date: booking.bookingDate,
+      timeSlot: booking.timeSlot,
+      status: booking.status,
+      createdDate: booking.createdAt,
+      adminResponse: booking.adminResponse, // Lý do từ chối (nếu có)
+    }));
+  }
 }

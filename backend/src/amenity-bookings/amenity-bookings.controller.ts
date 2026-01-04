@@ -39,4 +39,8 @@ export class AmenityBookingsController {
   ) {
     return this.bookingService.updateStatus(id, updateDto);
   }
+  @Get('user/:id')
+  findByUser(@Param('id', ParseIntPipe) id: number) {
+    return this.bookingService.findByUser(id);
+  }
 }
