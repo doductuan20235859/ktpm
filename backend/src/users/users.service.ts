@@ -9,6 +9,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UserRole } from '../common/enums/database.enums';
 
 @Injectable()
 export class UsersService {
@@ -104,5 +105,18 @@ export class UsersService {
     await this.usersRepository.update(userId, { passwordHash: newPassword });
 
     return { message: 'Đổi mật khẩu thành công' };
+  }
+
+  // ================= STATS =================
+  async getStats() {
+    const total = await this.usersRepository.count();
+    const admins = await this.usersRepository.count({
+      where: { role: UserRole.ADMIN },
+    });
+    const residents = await this.usersRepository.count({
+      where: { role: UserRole.RESIDENT },
+    });
+
+    return { total, admins, residents };
   }
 }

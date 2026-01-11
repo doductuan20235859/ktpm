@@ -1,10 +1,11 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   UseGuards,
   Req,
-  Get,
+  Query,
   Patch,
   Delete,
   Param,
@@ -39,6 +40,26 @@ export class RequestsController {
   @Get()
   findAll() {
     return this.requestsService.findAll_admin();
+  }
+
+  // Recent requests used by dashboard (admin sees all, resident sees own)
+  @Get('recent')
+  recent(@Req() req, @Query('limit') limit?: string) {
+    const take = limit ? Math.max(1, Math.min(50, parseInt(limit))) : 5;
+    if (req.user && req.user.role === 'RESIDENT') {
+      return this.requestsService.getRecentForResident(req.user, take);
+    }
+    return this.requestsService.getRecent(take);
+  }
+
+  // Statistics for dashboard
+  @Get('stats')
+  stats(@Req() req) {
+    // If resident, we provide counts limited to their apartment
+    if (req.user && req.user.role === 'RESIDENT') {
+      return this.requestsService.getStats(req.user);
+    }
+    return this.requestsService.getStats();
   }
 
   @Get(':id')

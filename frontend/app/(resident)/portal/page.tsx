@@ -134,6 +134,13 @@ export default function ResidentPortal() {
     try {
       setIsLoadingInvoices(true);
       const token = localStorage.getItem("accessToken");
+
+      // Lấy thông tin user trực tiếp để tránh lỗi closure state rỗng
+      const userStr = localStorage.getItem("userData");
+      const currentUser = userStr
+        ? JSON.parse(userStr)
+        : { fullName: "Cư dân" };
+
       const res = await fetch("http://localhost:3001/invoices/my-invoices", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -143,23 +150,31 @@ export default function ResidentPortal() {
 
         // Map dữ liệu từ Backend sang Frontend Interface
         const mappedData: Invoice[] = data.map((inv: any) => ({
-          id: inv.invoiceCode, // Mã hóa đơn
+          id: inv.invoiceCode,
+          // Format kỳ thanh toán: 2026-01-01 -> 01/2026
           period: new Date(inv.periodDate).toLocaleDateString("vi-VN", {
             month: "2-digit",
             year: "numeric",
-          }), // 12/2024
+          }),
           apartmentNumber: inv.apartment?.code || "N/A",
-          ownerName: profileData.name, // Tạm lấy tên user hiện tại
+          ownerName: currentUser.fullName, // SỬA: Dùng biến local thay vì state profileData
           issueDate: new Date(inv.createdAt).toLocaleDateString("vi-VN"),
           dueDate: new Date(inv.dueDate).toLocaleDateString("vi-VN"),
           totalAmount: Number(inv.totalAmount),
-          status: inv.status.toLowerCase(), // PAID -> paid, UNPAID -> unpaid
+
+          // SỬA QUAN TRỌNG: Kiểm tra status tồn tại trước khi toLowerCase
+          // Nếu API thiếu status, ta tự tính dựa trên tiền đã đóng
+          status: inv.status
+            ? inv.status.toLowerCase()
+            : Number(inv.paidAmount) >= Number(inv.totalAmount)
+            ? "paid"
+            : "unpaid",
+
           details: inv.items.map((item: any) => ({
-            name: item.description || item.feeType, // Nếu không có mô tả thì lấy loại phí
+            name: item.description || item.feeType,
             amount: Number(item.amount),
-            // Các trường unit, quantity backend chưa có thì tạm để trống hoặc handle sau
-            unit: "",
-            quantity: 1,
+            unit: "", // Backend chưa trả về
+            quantity: 1, // Backend chưa trả về
             unitPrice: Number(item.amount),
           })),
         }));

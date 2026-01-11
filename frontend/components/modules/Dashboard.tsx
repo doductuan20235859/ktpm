@@ -22,40 +22,83 @@ import {
 import { StatsCard } from "@/components/shared/StatsCard";
 import { RecentRequestsWidget } from "@/components/shared/RecentRequestsWidget";
 
-interface DashboardProps {
-  onNavigateToRequests?: () => void;
+interface ApartmentStats {
+  total: number;
+  occupied: number;
+  available: number;
+  maintenance: number;
 }
 
-export function Dashboard({ onNavigateToRequests }: DashboardProps) {
-  // Mock data cho các chỉ số
-  const apartmentStats = {
-    total: 240,
-    occupied: 198,
-    available: 32,
-    maintenance: 10,
+interface FinancialStats {
+  totalRevenue: number;
+  debtorCount: number;
+  collectionRate: number;
+  totalExpected: number;
+}
+
+interface FeeRow {
+  name: string;
+  amount: number;
+}
+
+interface RequestStats {
+  new: number;
+  inProgress: number;
+  resolved: number;
+}
+
+interface DashboardProps {
+  onNavigateToRequests?: () => void;
+  apartmentStats?: ApartmentStats | null; // optional, fetched from backend
+  financialStats?: FinancialStats | null;
+  revenueByFeeType?: FeeRow[] | null;
+  requestStats?: RequestStats | null;
+}
+
+export function Dashboard({
+  onNavigateToRequests,
+  apartmentStats: propApartmentStats,
+  financialStats: propFinancialStats,
+  revenueByFeeType: propRevenueByFeeType,
+  requestStats: propRequestStats,
+}: DashboardProps) {
+  // Use backend-provided apartment stats when available; otherwise show zeros (no mock data)
+  const apartmentStats = propApartmentStats ?? {
+    total: 0,
+    occupied: 0,
+    available: 0,
+    maintenance: 0,
   };
 
-  const financialStats = {
-    totalRevenue: 456780000, // VND
-    debtorCount: 12,
-    collectionRate: 94.5, // %
-    totalExpected: 485000000, // VND
+  const financialStats: FinancialStats = propFinancialStats ?? {
+    totalRevenue: 0,
+    debtorCount: 0,
+    collectionRate: 0,
+    totalExpected: 0,
   };
 
-  const requestStats = {
-    new: 15,
-    inProgress: 8,
-    resolved: 142,
+  const requestStats = propRequestStats ?? {
+    new: 0,
+    inProgress: 0,
+    resolved: 0,
   };
 
-  // Dữ liệu biểu đồ thu phí theo loại
-  const revenueByFeeType = [
-    { name: "Quản lý", amount: 156000000 },
-    { name: "Dịch vụ", amount: 124500000 },
-    { name: "Giữ xe", amount: 89200000 },
-    { name: "Nước", amount: 65800000 },
-    { name: "Điện", amount: 21280000 },
-  ];
+  // Map backend fee types (e.g., MANAGEMENT) to friendly Vietnamese labels
+  const feeTypeLabels: Record<string, string> = {
+    MANAGEMENT: "Quản lý",
+    SERVICE: "Dịch vụ",
+    PARKING: "Giữ xe",
+    WATER: "Nước",
+    ELECTRIC: "Điện",
+    INTERNET: "Internet",
+    OTHER: "Khác",
+  };
+
+  // Dữ liệu biểu đồ thu phí theo loại - use backend data when available, else empty
+  const revenueByFeeType: FeeRow[] = (propRevenueByFeeType ?? []).map((r) => ({
+    name: feeTypeLabels[r.name] ?? r.name,
+    amount: r.amount,
+  }));
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -126,14 +169,15 @@ export function Dashboard({ onNavigateToRequests }: DashboardProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatsCard
             title="Tổng Thu Tháng Này"
-            value={formatCurrency(financialStats.totalRevenue)}
+            value={formatCurrency(financialStats.totalExpected)}
             icon={DollarSign}
             iconColor="text-green-600"
             iconBgColor="bg-green-100"
-            subtitle={`Trong tổng số ${formatCurrency(
-              financialStats.totalExpected
-            )}`}
-            trend={{ value: "8.3%", isPositive: true }}
+            subtitle={`Đã thu: ${formatCurrency(financialStats.totalRevenue)}`}
+            trend={{
+              value: `${financialStats.collectionRate}%`,
+              isPositive: financialStats.collectionRate >= 0,
+            }}
           />
           <StatsCard
             title="Số Hộ Còn Nợ"
@@ -229,58 +273,6 @@ export function Dashboard({ onNavigateToRequests }: DashboardProps) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      </div>
-
-      {/* Quick Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-6">
-          <h3 className="text-lg text-blue-900 mb-3">Thông Tin Nổi Bật</h3>
-          <ul className="space-y-2 text-sm text-blue-800">
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-              Tỷ lệ lấp đầy:{" "}
-              <span>
-                {(
-                  (apartmentStats.occupied / apartmentStats.total) *
-                  100
-                ).toFixed(1)}
-                %
-              </span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-              Số tiền còn nợ:{" "}
-              <span>
-                {formatCurrency(
-                  financialStats.totalExpected - financialStats.totalRevenue
-                )}
-              </span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-              Tổng yêu cầu đang mở:{" "}
-              <span>{requestStats.new + requestStats.inProgress}</span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-6">
-          <h3 className="text-lg text-green-900 mb-3">Xu Hướng Tháng Này</h3>
-          <ul className="space-y-2 text-sm text-green-800">
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-              Thu phí tăng 8.3% so với tháng trước
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-600 rounded-full"></span>5 căn
-              hộ mới có người chuyển vào
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-              Giải quyết 142 yêu cầu trong tháng
-            </li>
-          </ul>
         </div>
       </div>
 

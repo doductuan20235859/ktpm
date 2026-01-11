@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   UseGuards,
   UseInterceptors,
@@ -82,5 +83,11 @@ export class UsersController {
     const userId = req.user.userId || req.user.sub || req.user.id;
 
     return this.usersService.changePassword(userId, changePasswordDto);
+  }
+
+  // Public endpoint for simple user stats used by admin dashboard
+  @Get('stats')
+  stats() {
+    return this.usersService.getStats();
   }
 }

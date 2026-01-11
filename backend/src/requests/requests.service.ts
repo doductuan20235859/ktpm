@@ -41,10 +41,11 @@ export class RequestsService {
 
   // Hàm lấy danh sách yêu cầu của user (để hiển thị list bên dưới)
   async findAllMyRequests(user: any) {
-    const whereCondition = user.role === 'RESIDENT' 
-      ? { apartment: { id: user.apartmentId } }
-      : { createdBy: { id: user.userId } };
-    
+    const whereCondition =
+      user.role === 'RESIDENT'
+        ? { apartment: { id: user.apartmentId } }
+        : { createdBy: { id: user.userId } };
+
     return await this.requestsRepository.find({
       where: whereCondition,
       order: { createdAt: 'DESC' }, // Mới nhất lên đầu
@@ -117,5 +118,74 @@ export class RequestsService {
 
   async remove_admin(id: number): Promise<void> {
     await this.requestsRepository.delete(id);
+  }
+
+  // ================= RECENT (for dashboard) =================
+  async getRecent(limit = 5) {
+    const recent = await this.requestsRepository.find({
+      order: { createdAt: 'DESC' },
+      take: limit,
+      relations: ['apartment', 'createdBy'],
+    });
+
+    return recent.map((r) => ({
+      id: r.id,
+      title: r.title,
+      residentName: r.createdBy?.fullName ?? 'N/A',
+      unitNumber: r.apartment ? r.apartment.code : 'N/A',
+      category: r.category,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  async getRecentForResident(user: any, limit = 5) {
+    const recent = await this.requestsRepository.find({
+      where: { apartment: { id: user.apartmentId } },
+      order: { createdAt: 'DESC' },
+      take: limit,
+      relations: ['apartment', 'createdBy'],
+    });
+
+    return recent.map((r) => ({
+      id: r.id,
+      title: r.title,
+      residentName: r.createdBy?.fullName ?? 'N/A',
+      unitNumber: r.apartment ? r.apartment.code : 'N/A',
+      category: r.category,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  // ================= STATS =================
+  async getStats(user?: any) {
+    // If user is resident, limit counts to their apartment
+    const baseQuery = this.requestsRepository.createQueryBuilder('request');
+
+    if (user && user.role === 'RESIDENT' && user.apartmentId) {
+      baseQuery.where('request.apartment_id = :apt', { apt: user.apartmentId });
+    }
+
+    const newCount = await baseQuery
+      .clone()
+      .andWhere('request.status = :new', { new: 'NEW' })
+      .getCount();
+    const inProgressCount = await baseQuery
+      .clone()
+      .andWhere('request.status IN (:...inProgress)', {
+        inProgress: ['IN_PROGRESS', 'ASSIGNED'],
+      })
+      .getCount();
+    const resolvedCount = await baseQuery
+      .clone()
+      .andWhere('request.status = :resolved', { resolved: 'RESOLVED' })
+      .getCount();
+
+    return {
+      new: newCount,
+      inProgress: inProgressCount,
+      resolved: resolvedCount,
+    };
   }
 }

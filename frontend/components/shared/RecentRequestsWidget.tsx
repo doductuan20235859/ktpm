@@ -1,13 +1,14 @@
 "use client";
 import { ChevronRight, Inbox } from "lucide-react";
 import { useRouter } from "next/navigation"; // [1] Import useRouter
+import { useEffect, useState } from "react";
 
 interface Request {
-  id: string;
+  id: string | number;
   residentName: string;
   unitNumber: string;
   category: string;
-  status: "New" | "Processing" | "Resolved" | "Rejected";
+  status: string; // Backend uses enums like NEW, IN_PROGRESS, RESOLVED, REJECTED
   createdAt: string;
 }
 
@@ -17,76 +18,127 @@ interface RecentRequestsWidgetProps {
 
 export function RecentRequestsWidget({ onViewAll }: RecentRequestsWidgetProps) {
   const router = useRouter(); // [2] Khởi tạo router
+  const [recentRequests, setRecentRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [unauthorized, setUnauthorized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - Top 5 most recent requests
-  const recentRequests: Request[] = [
-    {
-      id: "1",
-      residentName: "Nguyễn Văn An",
-      unitNumber: "A-101",
-      category: "Plumbing",
-      status: "New",
-      createdAt: "5 phút trước",
-    },
-    {
-      id: "2",
-      residentName: "Trần Thị Bình",
-      unitNumber: "B-205",
-      category: "Noise",
-      status: "New",
-      createdAt: "15 phút trước",
-    },
-    {
-      id: "3",
-      residentName: "Lê Văn Cường",
-      unitNumber: "C-302",
-      category: "Electrical",
-      status: "Processing",
-      createdAt: "1 giờ trước",
-    },
-    {
-      id: "4",
-      residentName: "Phạm Thị Dung",
-      unitNumber: "A-108",
-      category: "Cleaning",
-      status: "Processing",
-      createdAt: "2 giờ trước",
-    },
-    {
-      id: "5",
-      residentName: "Hoàng Văn Minh",
-      unitNumber: "B-301",
-      category: "Security",
-      status: "New",
-      createdAt: "3 giờ trước",
-    },
-  ];
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+  function timeAgo(dateStr: string) {
+    try {
+      const date = new Date(dateStr);
+      const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+      if (diff < 60) return `${diff} giây trước`;
+      if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+      return date.toLocaleDateString();
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    const token = localStorage.getItem("accessToken");
+
+    fetch(`${apiBase}/requests/recent?limit=5`, {
+      signal: controller.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then(async (res) => {
+        if (res.status === 401) {
+          setUnauthorized(true);
+          setRecentRequests([]);
+          setLoading(false);
+          return null;
+        }
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Status ${res.status} ${text}`);
+        }
+        setUnauthorized(false);
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        console.log("recent requests response:", data);
+        // data may be array of request objects
+        if (Array.isArray(data)) {
+          setRecentRequests(
+            data.map((r: any) => ({
+              id: r.id,
+              residentName: r.residentName || r.title || "N/A",
+              unitNumber: r.unitNumber || "N/A",
+              category: r.category || "N/A",
+              status: r.status || "NEW",
+              createdAt: timeAgo(r.createdAt),
+            }))
+          );
+          setError(null);
+        } else {
+          console.warn("Unexpected recent requests shape", data);
+          setRecentRequests([]);
+          setError("Unexpected data format");
+        }
+      })
+      .catch((err: any) => {
+        // Ignore abort errors (request was intentionally cancelled)
+        if (
+          err &&
+          (err.name === "AbortError" ||
+            err.message === "The operation was aborted.")
+        ) {
+          return;
+        }
+        console.error("Error fetching recent requests:", err);
+        setError(err.message || "Fetch error");
+      })
+      .finally(() => setLoading(false));
+
+    return () => {
+      try {
+        if (!controller.signal.aborted) controller.abort();
+      } catch (e) {
+        // ignore any errors when aborting
+      }
+    };
+  }, []);
 
   const newRequestsCount = recentRequests.filter(
-    (r) => r.status === "New"
+    (r) => (r.status || "").toString().toUpperCase() === "NEW"
   ).length;
 
-  const getStatusBadge = (status: Request["status"]) => {
-    switch (status) {
-      case "New":
+  const getStatusBadge = (status: string) => {
+    const s = (status || "").toString().toUpperCase();
+    switch (s) {
+      case "NEW":
         return {
           style: "bg-red-100 text-red-700 border border-red-200",
           label: "Mới",
         };
-      case "Processing":
+      case "IN_PROGRESS":
+      case "ASSIGNED":
         return {
           style: "bg-yellow-100 text-yellow-700 border border-yellow-200",
           label: "Đang xử lý",
         };
-      case "Resolved":
+      case "RESOLVED":
         return {
           style: "bg-green-100 text-green-700 border border-green-200",
           label: "Đã giải quyết",
         };
-      case "Rejected":
+      case "REJECTED":
+      case "CLOSED":
         return {
           style: "bg-gray-100 text-gray-700 border border-gray-200",
           label: "Từ chối",
+        };
+      default:
+        return {
+          style: "bg-gray-100 text-gray-700 border border-gray-200",
+          label: status,
         };
     }
   };
@@ -120,7 +172,30 @@ export function RecentRequestsWidget({ onViewAll }: RecentRequestsWidgetProps) {
 
       {/* Body - Fixed height, no scroll */}
       <div className="flex-1 px-6 py-4">
-        {recentRequests.length > 0 ? (
+        {loading ? (
+          <div className="h-full flex items-center justify-center text-center py-8">
+            <p className="text-sm text-gray-600">Đang tải...</p>
+          </div>
+        ) : unauthorized ? (
+          <div className="h-full flex flex-col items-center justify-center text-center py-8">
+            <div className="w-12 h-12 bg-yellow-50 rounded-full flex items-center justify-center mb-3">
+              <Inbox className="w-6 h-6 text-yellow-600" />
+            </div>
+            <p className="text-sm text-gray-600 mb-1">
+              Bạn cần đăng nhập để xem yêu cầu.
+            </p>
+            <p className="text-xs text-gray-500">
+              Vui lòng đăng nhập với tài khoản quản trị hoặc cư dân.
+            </p>
+          </div>
+        ) : error ? (
+          <div className="h-full flex flex-col items-center justify-center text-center py-8">
+            <p className="text-sm text-red-600 mb-2">Lỗi: {error}</p>
+            <p className="text-xs text-gray-500">
+              Không thể tải danh sách yêu cầu.
+            </p>
+          </div>
+        ) : recentRequests.length > 0 ? (
           <div className="space-y-3">
             {recentRequests.map((request) => {
               const statusBadge = getStatusBadge(request.status);
@@ -186,8 +261,12 @@ export function RecentRequestsWidget({ onViewAll }: RecentRequestsWidgetProps) {
       <div className="px-6 py-4 border-t border-gray-200">
         <button
           onClick={() => {
-            // [3] Điều hướng khi bấm nút
-            router.push("/requests");
+            // Use provided onViewAll if present (from parent), otherwise default to /requests
+            if (onViewAll) {
+              onViewAll();
+            } else {
+              router.push("/requests");
+            }
           }}
           className="flex items-center justify-end gap-1 text-sm text-blue-600 hover:text-blue-700 transition-colors ml-auto group"
         >

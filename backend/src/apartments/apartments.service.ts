@@ -1,12 +1,15 @@
-
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Apartment } from './entities/apartment.entity';
 import { CreateApartmentDto } from './dto/create-apartment.dto';
 import { UpdateApartmentDto } from './dto/update-apartment.dto';
-import { ResidentRole } from '../common/enums/database.enums';
+import { ResidentRole, ApartmentStatus } from '../common/enums/database.enums';
 import { User } from '../users/entities/user.entity';
 @Injectable()
 export class ApartmentsService {
@@ -19,13 +22,7 @@ export class ApartmentsService {
 
   // ================= CREATE =================
   async create(dto: CreateApartmentDto): Promise<Apartment> {
-    const {
-      buildingName,
-      unitNumber,
-      floorNumber,
-      areaSqm,
-      status,
-    } = dto;
+    const { buildingName, unitNumber, floorNumber, areaSqm, status } = dto;
 
     // ✅ Sinh code: A-202
     const code = `${buildingName}-${unitNumber}`;
@@ -54,7 +51,7 @@ export class ApartmentsService {
   }
 
   // ================= FIND ALL =================
-async findAll() {
+  async findAll() {
     // 1. Lấy dữ liệu kèm theo quan hệ owner và residents
     const apartments = await this.apartmentRepository.find({
       relations: ['owner', 'residents'],
@@ -63,9 +60,9 @@ async findAll() {
     // 2. Map dữ liệu để tính toán số thành viên (residentCount)
     return apartments.map((apt) => {
       const residents = apt.residents || [];
-      
+
       // Kiểm tra xem có người thuê (TENANT) đang hoạt động hay không
-      const activeResidents = residents.filter(r => r.isActive);
+      const activeResidents = residents.filter((r) => r.isActive);
       const hasActiveTenant = activeResidents.some(
         (r) => r.role === ResidentRole.TENANT,
       );
@@ -80,7 +77,8 @@ async findAll() {
       } else {
         // Nếu không có người thuê: Đếm cả OWNER và MEMBER
         residentCount = activeResidents.filter(
-          (r) => r.role === ResidentRole.OWNER || r.role === ResidentRole.MEMBER,
+          (r) =>
+            r.role === ResidentRole.OWNER || r.role === ResidentRole.MEMBER,
         ).length;
       }
 
@@ -97,64 +95,69 @@ async findAll() {
     });
   }
 
-
   // ================= FIND ONE =================
- async findOne(id: number) {
-  const apartment = await this.apartmentRepository.findOne({
-    where: { id },
-    relations: ['owner', 'residents', 'residents.user'], // Đã bao gồm quan hệ owner
-  });
+  async findOne(id: number) {
+    const apartment = await this.apartmentRepository.findOne({
+      where: { id },
+      relations: ['owner', 'residents', 'residents.user'], // Đã bao gồm quan hệ owner
+    });
 
-  if (!apartment) throw new NotFoundException('Không tìm thấy căn hộ');
+    if (!apartment) throw new NotFoundException('Không tìm thấy căn hộ');
 
-  return {
-    ...apartment,
-    // Lấy thông tin từ object owner (liên kết với entity User)
-    ownerName: apartment.owner ? apartment.owner.fullName : 'Chưa có chủ hộ',
-    ownerPhone: apartment.owner ? apartment.owner.phoneNumber : 'N/A',
-    
-    // Trả về danh sách thành viên được format sẵn
-    members: apartment.residents?.map(res => ({
-      id: res.id,
-      name: res.user?.fullName || 'N/A',
-      role: res.role,
-      phone: res.user?.phoneNumber || 'N/A',
-      joinDate: new Date(res.joinDate).toLocaleDateString('vi-VN'),
-      isActive: res.isActive
-    })) || []
-  };
-}
+    return {
+      ...apartment,
+      // Lấy thông tin từ object owner (liên kết với entity User)
+      ownerName: apartment.owner ? apartment.owner.fullName : 'Chưa có chủ hộ',
+      ownerPhone: apartment.owner ? apartment.owner.phoneNumber : 'N/A',
+
+      // Trả về danh sách thành viên được format sẵn
+      members:
+        apartment.residents?.map((res) => ({
+          id: res.id,
+          name: res.user?.fullName || 'N/A',
+          role: res.role,
+          phone: res.user?.phoneNumber || 'N/A',
+          joinDate: new Date(res.joinDate).toLocaleDateString('vi-VN'),
+          isActive: res.isActive,
+        })) || [],
+    };
+  }
   // ================= UPDATE =================
   async update(id: number, updateApartmentDto: UpdateApartmentDto) {
-  const apartment = await this.apartmentRepository.findOne({ 
-    where: { id },
-    relations: ['owner'] 
-  });
-  if (!apartment) throw new NotFoundException('Căn hộ không tồn tại');
+    const apartment = await this.apartmentRepository.findOne({
+      where: { id },
+      relations: ['owner'],
+    });
+    if (!apartment) throw new NotFoundException('Căn hộ không tồn tại');
 
-  // XỬ LÝ CẬP NHẬT THÔNG TIN CHỦ HỘ
-  if (apartment.owner) {
-    // Nếu căn hộ đã có chủ, ta cập nhật trực tiếp vào User đó
-    if (updateApartmentDto.ownerName) apartment.owner.fullName = updateApartmentDto.ownerName;
-    if (updateApartmentDto.ownerPhone) apartment.owner.phoneNumber = updateApartmentDto.ownerPhone;
-    
-    await this.userRepository.save(apartment.owner);
-  } else if (updateApartmentDto.ownerPhone) {
-    // Nếu chưa có chủ, tìm User theo số điện thoại để gán vào
-    const user = await this.userRepository.findOne({ where: { phoneNumber: updateApartmentDto.ownerPhone } });
-    if (user) {
-      apartment.ownerId = user.id;
+    // XỬ LÝ CẬP NHẬT THÔNG TIN CHỦ HỘ
+    if (apartment.owner) {
+      // Nếu căn hộ đã có chủ, ta cập nhật trực tiếp vào User đó
+      if (updateApartmentDto.ownerName)
+        apartment.owner.fullName = updateApartmentDto.ownerName;
+      if (updateApartmentDto.ownerPhone)
+        apartment.owner.phoneNumber = updateApartmentDto.ownerPhone;
+
+      await this.userRepository.save(apartment.owner);
+    } else if (updateApartmentDto.ownerPhone) {
+      // Nếu chưa có chủ, tìm User theo số điện thoại để gán vào
+      const user = await this.userRepository.findOne({
+        where: { phoneNumber: updateApartmentDto.ownerPhone },
+      });
+      if (user) {
+        apartment.ownerId = user.id;
+      }
     }
+
+    // Cập nhật các thông tin khác của căn hộ
+    if (updateApartmentDto.areaSqm)
+      apartment.areaSqm = Number(updateApartmentDto.areaSqm);
+    if (updateApartmentDto.code) apartment.code = updateApartmentDto.code;
+    if (updateApartmentDto.status) apartment.status = updateApartmentDto.status;
+
+    await this.apartmentRepository.save(apartment);
+    return this.findOne(id);
   }
-
-  // Cập nhật các thông tin khác của căn hộ
-  if (updateApartmentDto.areaSqm) apartment.areaSqm = Number(updateApartmentDto.areaSqm);
-  if (updateApartmentDto.code) apartment.code = updateApartmentDto.code;
-  if (updateApartmentDto.status) apartment.status = updateApartmentDto.status;
-
-  await this.apartmentRepository.save(apartment);
-  return this.findOne(id);
-}
   // async update(id: number, updateApartmentDto: UpdateApartmentDto) {
   //   const apartment = await this.apartmentRepository.findOne({ where: { id } });
   //   if (!apartment) throw new NotFoundException(`Căn hộ không tồn tại`);
@@ -190,5 +193,28 @@ async findAll() {
     }
 
     return { deleted: true };
+  }
+
+  // ================= STATS =================
+  async getStats() {
+    const total = await this.apartmentRepository.count();
+    const occupiedOwner = await this.apartmentRepository.count({
+      where: { status: ApartmentStatus.OCCUPIED_OWNER },
+    });
+    const occupiedTenant = await this.apartmentRepository.count({
+      where: { status: ApartmentStatus.OCCUPIED_TENANT },
+    });
+    const occupied = occupiedOwner + occupiedTenant;
+    const available = await this.apartmentRepository.count({
+      where: [
+        { status: ApartmentStatus.AVAILABLE },
+        { status: ApartmentStatus.VACANT },
+      ],
+    });
+    const maintenance = await this.apartmentRepository.count({
+      where: { status: ApartmentStatus.MAINTENANCE },
+    });
+
+    return { total, occupied, available, maintenance };
   }
 }
