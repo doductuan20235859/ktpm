@@ -552,12 +552,14 @@ export default function ResidentPortal() {
       dueDate: "20/12/2024",
     },
   ];
-
+  const unpaidInvoices = invoices.filter(
+    (inv) => inv.status === "unpaid" || inv.status === "partial"
+  );
   const totalDebt = invoices
     .filter((inv) => inv.status === "unpaid" || inv.status === "partial")
     .reduce((sum, inv) => sum + inv.totalAmount, 0);
   const earliestDueDate =
-    invoices
+    unpaidInvoices
       .filter((i) => i.status === "unpaid")
       .sort(
         (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
@@ -765,52 +767,118 @@ export default function ResidentPortal() {
           </div>
         </div>
 
-        {/* Payment Card */}
+        {/* Payment Card - ĐÃ CHỈNH SỬA */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* ... Header Card ... */}
-
-          {/* Hiển thị Tổng nợ từ dữ liệu thật */}
-          <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-4 mb-4 border border-red-200">
-            <p className="text-sm text-gray-600 mb-1">Tổng Tiền Nợ Hiện Tại</p>
-            <p className="text-3xl text-red-600">
-              {/* Sử dụng biến totalDebt cho gọn code */}
-              {formatCurrency(totalDebt)}
-            </p>
-            <p className="text-xs text-gray-500 mt-2">
-              Hạn thanh toán:{" "}
-              <span className="font-medium">{earliestDueDate}</span>
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl text-gray-900 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              Tra Cứu Phí
+            </h2>
+            <button
+              onClick={() => setShowPaymentHistory(!showPaymentHistory)}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <Eye className="w-4 h-4" />
+              {showPaymentHistory ? "Thu gọn" : "Lịch sử đóng tiền"}
+            </button>
           </div>
 
+          {/* Phần hiển thị Tổng Nợ */}
+          <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-4 mb-4 border border-red-200">
+            <p className="text-sm text-gray-600 mb-1">Tổng Tiền Nợ Hiện Tại</p>
+            <p className="text-3xl text-red-600 font-bold">
+              {formatCurrency(totalDebt)}
+            </p>
+            {unpaidInvoices.length > 0 ? (
+              <p className="text-xs text-gray-500 mt-2">
+                Bạn có{" "}
+                <span className="font-bold text-red-600">
+                  {unpaidInvoices.length}
+                </span>{" "}
+                hóa đơn chưa thanh toán.
+                <br />
+                Hạn sớm nhất:{" "}
+                <span className="font-medium">{earliestDueDate}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-green-600 mt-2 font-medium">
+                Tuyệt vời! Bạn không có khoản nợ nào.
+              </p>
+            )}
+          </div>
+
+          {/* DANH SÁCH CÁC KHOẢN ĐANG NỢ (Hiển thị mặc định) */}
+          {!showPaymentHistory && unpaidInvoices.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase">
+                Danh sách cần thanh toán
+              </h3>
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                {unpaidInvoices.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-red-100 bg-red-50/50 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    <div className="mb-2 sm:mb-0">
+                      <p className="text-gray-900 font-medium">
+                        Kỳ: {inv.period}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Hạn: {inv.dueDate}
+                      </p>
+                      <p className="text-sm text-red-600 font-bold mt-1">
+                        {formatCurrency(inv.totalAmount)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCurrentInvoice(inv);
+                        setShowPaymentDetailModal(true);
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors shadow-sm whitespace-nowrap"
+                    >
+                      Thanh Toán Ngay
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LỊCH SỬ THANH TOÁN (Chỉ hiện khi bấm xem lịch sử - bao gồm cả đã đóng và chưa đóng) */}
           {showPaymentHistory && (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              <h3 className="text-sm text-gray-700 mb-2">Lịch sử thanh toán</h3>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <h3 className="text-sm text-gray-700 mb-2 font-semibold">
+                Tất cả hóa đơn
+              </h3>
               {isLoadingInvoices ? (
                 <div className="text-center py-2">
                   <Loader2 className="animate-spin inline" />
                 </div>
               ) : invoices.length === 0 ? (
                 <p className="text-center text-gray-500 text-sm">
-                  Chưa có hóa đơn nào
+                  Chưa có dữ liệu hóa đơn
                 </p>
               ) : (
                 invoices.map((inv) => (
                   <div
                     key={inv.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 border border-transparent hover:border-gray-200"
                     onClick={() => {
                       setCurrentInvoice(inv);
                       setShowPaymentDetailModal(true);
                     }}
                   >
                     <div>
-                      <p className="text-gray-900">Tháng {inv.period}</p>
+                      <p className="text-gray-900 font-medium">
+                        Tháng {inv.period}
+                      </p>
                       <p className="text-sm text-gray-600">
                         {formatCurrency(inv.totalAmount)}
                       </p>
                     </div>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs ${
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
                         inv.status === "paid"
                           ? "bg-green-100 text-green-700"
                           : "bg-red-100 text-red-700"
@@ -824,25 +892,6 @@ export default function ResidentPortal() {
                 ))
               )}
             </div>
-          )}
-
-          {!showPaymentHistory && (
-            <button
-              onClick={() => {
-                // Tìm hóa đơn chưa thanh toán gần nhất để hiển thị
-                const unpaid =
-                  invoices.find((i) => i.status === "unpaid") || invoices[0];
-                if (unpaid) {
-                  setCurrentInvoice(unpaid);
-                  setShowPaymentDetailModal(true);
-                } else {
-                  toast.info("Bạn không có hóa đơn nào cần thanh toán");
-                }
-              }}
-              className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Xem Chi Tiết & Thanh Toán
-            </button>
           )}
         </div>
 
