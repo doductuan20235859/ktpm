@@ -44,6 +44,9 @@ export class Vehicle {
   @Column({ name: 'registration_doc_url', type: 'text', nullable: true })
   registrationDocUrl: string | null;
 
+  @Column({ name: 'admin_response', type: 'text', nullable: true })
+  adminResponse: string | null;
+
   @Column({ type: 'enum', enum: VehicleStatus, default: VehicleStatus.PENDING })
   status: VehicleStatus;
 

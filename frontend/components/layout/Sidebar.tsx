@@ -10,6 +10,7 @@ import {
   Sparkles,
   DollarSign,
   Settings,
+  Truck,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -64,6 +65,12 @@ export function Sidebar({ isOpen, userRole }: SidebarProps) {
         icon: Sparkles,
         label: "Quản Lý Tiện Ích",
         color: "text-purple-600",
+      },
+      {
+        href: "/admin_vehicles",
+        icon: Truck,
+        label: "Quản Lý Xe",
+        color: "text-amber-600",
       },
       {
         href: "/financial",

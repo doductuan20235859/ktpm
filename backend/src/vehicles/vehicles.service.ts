@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vehicle } from './entities/vehicle.entity';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
+import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { User } from '../users/entities/user.entity';
 import { Apartment } from '../apartments/entities/apartment.entity';
 import { VehicleStatus } from '../common/enums/database.enums';
@@ -94,6 +95,68 @@ export class VehiclesService {
     }
 
     return vehicle;
+  }
+
+  // --- ADMIN: Lấy tất cả xe (Admin only) ---
+  async findAllForAdmin() {
+    return await this.vehiclesRepository.find({
+      relations: ['user', 'apartment'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // Sửa xe (owner)
+  async update(id: number, userId: number, updateVehicleDto: any) {
+    const vehicle = await this.vehiclesRepository.findOne({
+      where: { id },
+      relations: ['user', 'apartment'],
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException(`Không tìm thấy xe có ID ${id}`);
+    }
+
+    if (vehicle.user.id !== userId) {
+      throw new BadRequestException('Bạn không có quyền sửa xe này');
+    }
+
+    Object.assign(vehicle, updateVehicleDto);
+
+    return await this.vehiclesRepository.save(vehicle);
+  }
+
+  // Sửa xe (Admin)
+  async updateByAdmin(id: number, updateVehicleDto: any) {
+    const vehicle = await this.vehiclesRepository.findOne({
+      where: { id },
+      relations: ['user', 'apartment'],
+    });
+    if (!vehicle) throw new NotFoundException(`Không tìm thấy xe có ID ${id}`);
+
+    Object.assign(vehicle, updateVehicleDto);
+
+    return await this.vehiclesRepository.save(vehicle);
+  }
+
+  // Xóa bởi Admin
+  async removeByAdmin(id: number) {
+    const vehicle = await this.vehiclesRepository.findOne({ where: { id } });
+    if (!vehicle) throw new NotFoundException(`Không tìm thấy xe có ID ${id}`);
+
+    if (vehicle.photoUrl) {
+      this.deleteFile(vehicle.photoUrl);
+    }
+
+    if (vehicle.registrationDocUrl) {
+      this.deleteFile(vehicle.registrationDocUrl);
+    }
+
+    await this.vehiclesRepository.remove(vehicle);
+
+    return {
+      message: `Đã xóa xe ${vehicle.plateNumber} thành công`,
+      deletedId: id,
+    };
   }
 
   // Xóa xe
