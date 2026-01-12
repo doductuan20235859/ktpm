@@ -530,7 +530,8 @@ export default function AdminAmenitiesManagement() {
                           Bảo trì
                         </span>
                       )}
-                      <button
+                    </div>
+                    {/* <button
                         onClick={() => handleToggleActive(amenity.id)}
                         className={`p-2 rounded-lg transition-colors ${
                           amenity.isActive
@@ -540,8 +541,7 @@ export default function AdminAmenitiesManagement() {
                         title={amenity.isActive ? "Đang hoạt động" : "Đã tắt"}
                       >
                         <Power className="w-4 h-4" />
-                      </button>
-                    </div>
+                      </button> */}
                   </div>
 
                   <p className="text-sm text-gray-600 mb-3 line-clamp-2">

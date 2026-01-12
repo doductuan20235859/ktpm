@@ -78,12 +78,14 @@ export class InvoicesService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const generatedInvoiceCode = `INV-${createInvoiceDto.period}-${createInvoiceDto.building.replace(/Tòa\s+/i, '')}${createInvoiceDto.apartmentCode}`;
     try {
       // 1. Tìm Apartment dựa trên building và apartmentCode gửi từ Frontend
+      // Logic xử lý chuỗi: xóa chữ "Tòa " và nối chuỗi mã căn hộ
+      const apartmentCodeSearch = `${createInvoiceDto.building.replace(/Tòa\s+/i, '')}-${createInvoiceDto.apartmentCode}`;
+
       const apartment = await this.apartmentRepository.findOne({
         where: {
-          code: `${createInvoiceDto.building.replace(/Tòa\s+/i, '')}-${createInvoiceDto.apartmentCode}`,
+          code: apartmentCodeSearch,
         },
       });
 
@@ -94,16 +96,17 @@ export class InvoicesService {
       }
 
       // 2. Chuẩn bị dữ liệu Invoice
-      // Chuyển đổi chuỗi "YYYY-MM" hoặc "YYYY-MM-DD" từ DTO sang kiểu Date cho Entity
+      // Tạo mã hóa đơn (Vẫn giữ logic tạo mã để lưu vào DB)
+      const invoiceCodeStr = `INV-${createInvoiceDto.period}-${createInvoiceDto.building.replace(/Tòa\s+/i, '')}${createInvoiceDto.apartmentCode}`;
+
       const invoice = queryRunner.manager.create(Invoice, {
         apartment: apartment,
-        periodDate: new Date(createInvoiceDto.period), //"2024-05"
+        periodDate: new Date(createInvoiceDto.period),
         dueDate: new Date(createInvoiceDto.dueDate),
         notes: createInvoiceDto.notes,
         totalAmount: createInvoiceDto.totalAmount,
         paidAmount: createInvoiceDto.paidAmount || 0,
-        // InvoiceCode bạn có thể tự sinh hoặc để null nếu DB tự sinh
-        invoiceCode: `INV-${createInvoiceDto.period}-${createInvoiceDto.building.replace(/Tòa\s+/i, '')}${createInvoiceDto.apartmentCode}`,
+        invoiceCode: invoiceCodeStr,
         createdAt: new Date(),
         // Gán mảng items trực tiếp vào đây nhờ cascade: true
         items: createInvoiceDto.items.map((item) => ({
@@ -116,13 +119,14 @@ export class InvoicesService {
       const savedInvoice = await queryRunner.manager.save(invoice);
 
       await queryRunner.commitTransaction();
+      return savedInvoice; // Trả về kết quả sau khi lưu thành công
     } catch (err) {
+      // Nếu có lỗi, rollback lại transaction
       await queryRunner.rollbackTransaction();
-      if (err.code === '23505') {
-        throw new ConflictException(
-          `Mã hóa đơn ${generatedInvoiceCode} đã tồn tại. Vui lòng kiểm tra lại kỳ thanh toán!`,
-        );
-      }
+
+      // ĐÃ XÓA: Đoạn check if (err.code === '23505') throw ConflictException...
+
+      // Ném lỗi gốc ra ngoài (NestJS sẽ xử lý thành Internal Server Error hoặc lỗi tương ứng của DB)
       throw err;
     } finally {
       await queryRunner.release();

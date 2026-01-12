@@ -1,131 +1,131 @@
-  import { useState, useRef } from "react";
-  import { X, Upload, Camera } from "lucide-react";
-  import { toast } from "sonner";
+import { useState, useRef } from "react";
+import { X, Upload, Camera } from "lucide-react";
+import { toast } from "sonner";
 
-  type ApartmentStatus =
-    | "OCCUPIED_OWNER"
-    | "OCCUPIED_TENANT"
-    | "AVAILABLE"
-    | "VACANT"
-    | "MAINTENANCE";
+type ApartmentStatus =
+  | "OCCUPIED_OWNER"
+  | "OCCUPIED_TENANT"
+  | "AVAILABLE"
+  | "VACANT"
+  | "MAINTENANCE";
 
-  interface EditApartmentModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    apartment: {
-      id: string;
-      code: string;
-      area: number;
-      owner: string;
-      phone: string;
-      status: ApartmentStatus;
-    };
-    onUpdate: (data: ApartmentUpdateData) => void;
-  }
-
-  export interface ApartmentUpdateData {
+interface EditApartmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  apartment: {
+    id: string;
     code: string;
     area: number;
     owner: string;
     phone: string;
     status: ApartmentStatus;
-    avatarUrl?: string;
-    coverUrl?: string;
-  }
+  };
+  onUpdate: (data: ApartmentUpdateData) => void;
+}
 
-  export function EditApartmentModal({
-    isOpen,
-    onClose,
-    apartment,
-    onUpdate,
-  }: EditApartmentModalProps) {
-    const [formData, setFormData] = useState<ApartmentUpdateData>({
-      code: apartment.code,
-      area: apartment.area,
-      owner: apartment.owner,
-      phone: apartment.phone,
-      status: apartment.status,
-    });
+export interface ApartmentUpdateData {
+  code: string;
+  area: number;
+  owner: string;
+  phone: string;
+  status: ApartmentStatus;
+  avatarUrl?: string;
+  coverUrl?: string;
+}
 
-    const [avatarPreview, setAvatarPreview] = useState<string>("");
-    const [coverPreview, setCoverPreview] = useState<string>("");
-    const avatarInputRef = useRef<HTMLInputElement>(null);
-    const coverInputRef = useRef<HTMLInputElement>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false); // Trạng thái loading
-    const [errors, setErrors] = useState<Record<string, string>>({});
+export function EditApartmentModal({
+  isOpen,
+  onClose,
+  apartment,
+  onUpdate,
+}: EditApartmentModalProps) {
+  const [formData, setFormData] = useState<ApartmentUpdateData>({
+    code: apartment.code,
+    area: apartment.area,
+    owner: apartment.owner,
+    phone: apartment.phone,
+    status: apartment.status,
+  });
 
-    if (!isOpen) return null;
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [coverPreview, setCoverPreview] = useState<string>("");
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Trạng thái loading
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const handleInputChange = (
-      field: keyof ApartmentUpdateData,
-      value: string | number
-    ) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-      if (errors[field]) {
-        setErrors((prev) => ({ ...prev, [field]: "" }));
+  if (!isOpen) return null;
+
+  const handleInputChange = (
+    field: keyof ApartmentUpdateData,
+    value: string | number
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Kích thước ảnh không được vượt quá 5MB");
+        return;
       }
-    };
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setAvatarPreview(result);
+        setFormData((prev) => ({ ...prev, avatarUrl: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error("Kích thước ảnh không được vượt quá 5MB");
-          return;
-        }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          setAvatarPreview(result);
-          setFormData((prev) => ({ ...prev, avatarUrl: result }));
-        };
-        reader.readAsDataURL(file);
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Kích thước ảnh không được vượt quá 5MB");
+        return;
       }
-    };
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setCoverPreview(result);
+        setFormData((prev) => ({ ...prev, coverUrl: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-    const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error("Kích thước ảnh không được vượt quá 5MB");
-          return;
-        }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          setCoverPreview(result);
-          setFormData((prev) => ({ ...prev, coverUrl: result }));
-        };
-        reader.readAsDataURL(file);
-      }
-    };
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
-    const validateForm = (): boolean => {
-      const newErrors: Record<string, string> = {};
+    if (!formData.code.trim()) {
+      newErrors.code = "Vui lòng nhập mã căn hộ";
+    }
 
-      if (!formData.code.trim()) {
-        newErrors.code = "Vui lòng nhập mã căn hộ";
-      }
+    if (!formData.owner.trim()) {
+      newErrors.owner = "Vui lòng nhập tên chủ hộ";
+    }
 
-      if (!formData.owner.trim()) {
-        newErrors.owner = "Vui lòng nhập tên chủ hộ";
-      }
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Vui lòng nhập số điện thoại";
+    } else if (!/^[0-9]{10}$/.test(formData.phone)) {
+      newErrors.phone = "Số điện thoại không hợp lệ";
+    }
 
-      if (!formData.phone.trim()) {
-        newErrors.phone = "Vui lòng nhập số điện thoại";
-      } else if (!/^[0-9]{10}$/.test(formData.phone)) {
-        newErrors.phone = "Số điện thoại không hợp lệ";
-      }
+    if (formData.area <= 0) {
+      newErrors.area = "Diện tích phải lớn hơn 0";
+    }
 
-      if (formData.area <= 0) {
-        newErrors.area = "Diện tích phải lớn hơn 0";
-      }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-      setErrors(newErrors);
-      return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -149,44 +149,44 @@
       // }
 
       // const updatedData = await response.json();
-      
+
       // toast.success("Cập nhật căn hộ thành công!");
       // onUpdate(updatedData); // Gọi callback để cập nhật lại danh sách ở trang cha
       // onClose(); // Đóng modal
-      await onUpdate(formData); 
-    onClose();
+      await onUpdate(formData);
+      onClose();
     } catch (error: any) {
       toast.error(error.message || "Lỗi cập nhật");
     } finally {
       setIsSubmitting(false);
     }
   };
-    const statusOptions = [
-      { value: "OCCUPIED_OWNER", label: "Chủ hộ đang ở" },
-      { value: "OCCUPIED_TENANT", label: "Đang cho thuê" },
-      { value: "AVAILABLE", label: "Sẵn sàng cho thuê" },
-      { value: "VACANT", label: "Trống" },
-      { value: "MAINTENANCE", label: "Đang bảo trì" },
-    ];
+  const statusOptions = [
+    { value: "OCCUPIED_OWNER", label: "Chủ hộ đang ở" },
+    { value: "OCCUPIED_TENANT", label: "Đang cho thuê" },
+    { value: "AVAILABLE", label: "Sẵn sàng cho thuê" },
+    // { value: "VACANT", label: "Trống" },
+    { value: "MAINTENANCE", label: "Đang bảo trì" },
+  ];
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700">
-            <h2 className="text-xl text-white">Cập Nhật Căn Hộ</h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-blue-800 rounded-lg p-1 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700">
+          <h2 className="text-xl text-white">Cập Nhật Căn Hộ</h2>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-blue-800 rounded-lg p-1 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="space-y-5">
-              {/* Cover Image Upload
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="space-y-5">
+            {/* Cover Image Upload
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
                   Ảnh Bìa
@@ -225,8 +225,8 @@
                 />
               </div> */}
 
-              {/* Avatar Upload */}
-              {/* <div>
+            {/* Avatar Upload */}
+            {/* <div>
                 <label className="block text-sm text-gray-700 mb-2">
                   Ảnh Đại Diện
                 </label>
@@ -252,7 +252,7 @@
                       </div>
                     )}
                   </div> */}
-                  {/* <div className="flex-1">
+            {/* <div className="flex-1">
                     <p className="text-sm text-gray-600 mb-1">
                       Tải lên ảnh đại diện cho căn hộ
                     </p>
@@ -260,7 +260,7 @@
                       Định dạng: JPG, PNG. Kích thước tối đa: 5MB
                     </p>
                   </div> */}
-                {/* </div>
+            {/* </div>
                 <input
                   ref={avatarInputRef}
                   type="file"
@@ -270,130 +270,130 @@
                 />
               </div> */}
 
-              {/* Form Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">
-                    Mã Căn Hộ <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => handleInputChange("code", e.target.value)}
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.code ? "border-red-500" : "border-gray-300"
-                    }`}
-                    placeholder="VD: A-101"
-                  />
-                  {errors.code && (
-                    <p className="text-xs text-red-500 mt-1">{errors.code}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">
-                    Diện Tích (m²) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.area}
-                    onChange={(e) =>
-                      handleInputChange("area", parseFloat(e.target.value))
-                    }
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.area ? "border-red-500" : "border-gray-300"
-                    }`}
-                    placeholder="VD: 68.5"
-                    step="0.1"
-                  />
-                  {errors.area && (
-                    <p className="text-xs text-red-500 mt-1">{errors.area}</p>
-                  )}
-                </div>
-              </div>
-
+            {/* Form Fields */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
-                  Chủ Hộ <span className="text-red-500">*</span>
+                  Mã Căn Hộ <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={formData.owner}
-                  onChange={(e) => handleInputChange("owner", e.target.value)}
+                  value={formData.code}
+                  onChange={(e) => handleInputChange("code", e.target.value)}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.owner ? "border-red-500" : "border-gray-300"
+                    errors.code ? "border-red-500" : "border-gray-300"
                   }`}
-                  placeholder="Nhập tên chủ hộ"
+                  placeholder="VD: A-101"
                 />
-                {errors.owner && (
-                  <p className="text-xs text-red-500 mt-1">{errors.owner}</p>
+                {errors.code && (
+                  <p className="text-xs text-red-500 mt-1">{errors.code}</p>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
-                  Số Điện Thoại <span className="text-red-500">*</span>
+                  Diện Tích (m²) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  type="number"
+                  value={formData.area}
+                  onChange={(e) =>
+                    handleInputChange("area", parseFloat(e.target.value))
+                  }
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.phone ? "border-red-500" : "border-gray-300"
+                    errors.area ? "border-red-500" : "border-gray-300"
                   }`}
-                  placeholder="0901234567"
+                  placeholder="VD: 68.5"
+                  step="0.1"
                 />
-                {errors.phone && (
-                  <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
+                {errors.area && (
+                  <p className="text-xs text-red-500 mt-1">{errors.area}</p>
                 )}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">
-                  Trạng Thái <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) =>
-                    handleInputChange("status", e.target.value as ApartmentStatus)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-2">
+                Chủ Hộ <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.owner}
+                onChange={(e) => handleInputChange("owner", e.target.value)}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.owner ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="Nhập tên chủ hộ"
+              />
+              {errors.owner && (
+                <p className="text-xs text-red-500 mt-1">{errors.owner}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-2">
+                Số Điện Thoại <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.phone ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="0901234567"
+              />
+              {errors.phone && (
+                <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-2">
+                Trạng Thái <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) =>
+                  handleInputChange("status", e.target.value as ApartmentStatus)
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
-      <button
-        onClick={onClose}
-        disabled={isSubmitting}
-        className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-      >
-        Hủy
-      </button>
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting}
-        className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
-      >
-        {isSubmitting ? (
-          <>
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            Đang lưu...
-          </>
-        ) : (
-          "Cập Nhật"
-        )}
-      </button>
-    </div>
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Đang lưu...
+              </>
+            ) : (
+              "Cập Nhật"
+            )}
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}

@@ -16,7 +16,7 @@ export class Invoice {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'invoice_code', length: 50, unique: true, nullable: true })
+  @Column({ name: 'invoice_code', length: 50, unique: false, nullable: true })
   invoiceCode: string;
 
   @ManyToOne(() => Apartment, (apt) => apt.invoices)
