@@ -11,6 +11,7 @@ import {
   DollarSign,
   Settings,
   Truck,
+  Bell,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -71,6 +72,12 @@ export function Sidebar({ isOpen, userRole }: SidebarProps) {
         icon: Truck,
         label: "Quản Lý Xe",
         color: "text-amber-600",
+      },
+      {
+        href: "/admin_notifications",
+        icon: Bell,
+        label: "Quản Lý Thông Báo",
+        color: "text-red-600",
       },
       {
         href: "/financial",
