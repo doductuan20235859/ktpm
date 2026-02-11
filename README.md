@@ -24,7 +24,7 @@ Hệ thống được xây dựng theo mô hình Client – Server, kiến trúc
   - Tự động tính toán và phát hành hóa đơn  
 
 - Theo dõi vận hành  
-  - Dashboard thống kê thời gian thực:  
+  - Dashboard thống kê thời gian thực  
     - Mật độ cư dân  
     - Tình trạng phòng trống  
     - Doanh thu  
@@ -67,47 +67,42 @@ Hệ thống được xây dựng theo mô hình Client – Server, kiến trúc
 ## 📂 Cấu trúc dự án
 
 ```plaintext
-├── backend/               # Backend NestJS
+├── backend/
 │   ├── src/
 │   │   ├── modules/       # Auth, Users, Apartments, Invoices, Requests...
 │   │   ├── entities/      # TypeORM Entities
 │   │   └── common/        # Guards, decorators, utils
 │
-├── frontend/              # Frontend Next.js
+├── frontend/
 │   ├── app/               # App Router (auth, admin, resident)
 │   ├── components/        # Reusable UI components
 │   └── public/            # Assets, images
 │
 └── database/
     └── ktpm.sql            # Database schema & mock data
-## ⚙️ Cài đặt và chạy dự án
+⚙️ Cài đặt và chạy dự án
+🔧 Yêu cầu hệ thống
+Node.js v18 LTS trở lên
 
-### 🔧 Yêu cầu hệ thống
+PostgreSQL v15 trở lên
 
-- Node.js v18 LTS trở lên  
-- PostgreSQL v15 trở lên  
+🗄️ Thiết lập cơ sở dữ liệu
+Tạo database ktpm trong PostgreSQL
 
----
+Import file database/ktpm.sql
 
-### 🗄️ Thiết lập cơ sở dữ liệu
-
-1. Tạo database `ktpm` trong PostgreSQL  
-2. Import file `database/ktpm.sql` để khởi tạo bảng và dữ liệu mẫu  
-
----
-
-### 🖥️ Chạy Backend
-
-```bash
+🖥️ Chạy Backend
 cd backend
 npm install
-Tạo file .env trong thư mục backend với nội dung:
+Tạo file .env trong thư mục backend:
+
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_password
 DATABASE_NAME=ktpm
 Chạy server backend:
+
 npm run start:dev
 🌐 Chạy Frontend
 cd frontend
@@ -116,13 +111,11 @@ npm run dev
 Truy cập ứng dụng tại:
 
 http://localhost:3000
-
 📝 Tài khoản dùng thử
 Vai trò	Số điện thoại	Mật khẩu
 Admin	0901000001	123456
 Cư dân	0988333444	123456
 👥 Nhóm thực hiện (Nhóm 16)
-
 Võ Huy Hoàng – Thu phí & Hóa đơn
 
 Lê Quang Lợi – Quản lý Dân cư & File
@@ -134,7 +127,6 @@ Lê Quang Lợi – Quản lý Dân cư & File
 Đặng Xuân Khải
 
 🎓 Thông tin học phần
-
 Học phần: Kỹ thuật phần mềm (IT4082)
 
 Trường: Đại học Bách Khoa Hà Nội
