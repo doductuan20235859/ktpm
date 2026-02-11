@@ -80,44 +80,41 @@ Hệ thống được xây dựng theo mô hình Client – Server, kiến trúc
 │
 └── database/
     └── ktpm.sql            # Database schema & mock data
-⚙️ Cài đặt và chạy dự án
-🔧 Yêu cầu hệ thống
+## ⚙️ Cài đặt và chạy dự án
 
-Node.js v18 LTS trở lên
+### 🔧 Yêu cầu hệ thống
 
-PostgreSQL v15 trở lên
+- Node.js v18 LTS trở lên  
+- PostgreSQL v15 trở lên  
 
-🗄️ Thiết lập cơ sở dữ liệu
+---
 
-Tạo database ktpm trong PostgreSQL
+### 🗄️ Thiết lập cơ sở dữ liệu
 
-Import file database/ktpm.sql
+1. Tạo database `ktpm` trong PostgreSQL  
+2. Import file `database/ktpm.sql` để khởi tạo bảng và dữ liệu mẫu  
 
-🖥️ Chạy Backend
+---
+
+### 🖥️ Chạy Backend
+
+```bash
 cd backend
 npm install
-
-
-Tạo file .env:
-
+Tạo file .env trong thư mục backend với nội dung:
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_password
 DATABASE_NAME=ktpm
-
-
-Chạy server:
-
+Chạy server backend:
 npm run start:dev
-
 🌐 Chạy Frontend
 cd frontend
 npm install
 npm run dev
+Truy cập ứng dụng tại:
 
-
-Truy cập:
 http://localhost:3000
 
 📝 Tài khoản dùng thử
